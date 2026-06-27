@@ -44,7 +44,7 @@ class LiteLLMClient:
         """
         response = await litellm.acompletion(
             model=os.environ.get(BIFROST_MODEL_ENV, DEFAULT_BIFROST_MODEL),
-            api_base=os.environ[BIFROST_API_BASE_ENV],
+            api_base=f"{os.environ[BIFROST_API_BASE_ENV]}/litellm",
             api_key=os.environ[BIFROST_API_KEY_ENV],
             messages=messages,
             tools=tools,
