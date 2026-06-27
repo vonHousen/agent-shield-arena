@@ -1,6 +1,4 @@
 const state = {
-  connectedAt: null,
-  elapsedTimer: null,
   events: 0,
   messages: 0,
   toolCalls: 0,
@@ -9,7 +7,6 @@ const state = {
 
 const elements = {
   statusBadge: document.querySelector("#statusBadge"),
-  elapsedTime: document.querySelector("#elapsedTime"),
   eventCount: document.querySelector("#eventCount"),
   conversation: document.querySelector("#conversation"),
   emptyState: document.querySelector("#emptyState"),
@@ -19,7 +16,6 @@ const elements = {
   toolResultMetric: document.querySelector("#toolResultMetric"),
   latestType: document.querySelector("#latestType"),
   latestTimestamp: document.querySelector("#latestTimestamp"),
-  toolActivity: document.querySelector("#toolActivity"),
 };
 
 elements.scrollButton.addEventListener("click", () => {
@@ -34,7 +30,6 @@ function connectWebSocket() {
 
   socket.addEventListener("open", () => {
     setStatus("Running", "running");
-    startElapsedTimer();
   });
 
   socket.addEventListener("message", (message) => {
@@ -44,7 +39,6 @@ function connectWebSocket() {
 
   socket.addEventListener("close", () => {
     setStatus("Idle", "idle");
-    stopElapsedTimer();
     window.setTimeout(connectWebSocket, 1500);
   });
 
@@ -119,7 +113,6 @@ function appendToolCall(payload) {
   details.append(summary, code);
   row.append(details);
   appendConversationNode(row);
-  appendToolActivity(`Called ${payload.tool_name}`, payload.arguments);
 }
 
 function appendToolResult(payload) {
@@ -141,7 +134,6 @@ function appendToolResult(payload) {
   details.append(summary, code);
   row.append(details);
   appendConversationNode(row);
-  appendToolActivity(`Returned from ${payload.tool_name}`, payload.result);
 }
 
 function appendConversationNode(node) {
@@ -155,26 +147,6 @@ function appendConversationNode(node) {
   }
 }
 
-function appendToolActivity(title, value) {
-  if (state.toolCalls + state.toolResults === 1) {
-    elements.toolActivity.replaceChildren();
-  }
-
-  const item = document.createElement("div");
-  item.className = "border border-zinc-800 bg-zinc-950 p-3";
-
-  const label = document.createElement("p");
-  label.className = "font-medium text-zinc-200";
-  label.textContent = title;
-
-  const code = document.createElement("pre");
-  code.className = "mt-2 max-h-28 overflow-auto text-xs text-zinc-400";
-  code.textContent = JSON.stringify(value, null, 2);
-
-  item.append(label, code);
-  elements.toolActivity.prepend(item);
-}
-
 function updateMetrics() {
   elements.messageMetric.textContent = state.messages;
   elements.toolCallMetric.textContent = state.toolCalls;
@@ -183,7 +155,7 @@ function updateMetrics() {
 
 function setStatus(label, status) {
   elements.statusBadge.textContent = label;
-  elements.statusBadge.className = "rounded-full border px-3 py-1";
+  elements.statusBadge.className = "rounded-full border px-3 py-1 text-sm";
 
   if (status === "running") {
     elements.statusBadge.classList.add("border-emerald-500/40", "bg-emerald-500/10", "text-emerald-300");
@@ -191,23 +163,6 @@ function setStatus(label, status) {
   }
 
   elements.statusBadge.classList.add("border-zinc-700", "text-zinc-300");
-}
-
-function startElapsedTimer() {
-  if (state.elapsedTimer !== null) {
-    return;
-  }
-
-  state.connectedAt = Date.now();
-  state.elapsedTimer = window.setInterval(() => {
-    const elapsedSeconds = Math.floor((Date.now() - state.connectedAt) / 1000);
-    elements.elapsedTime.textContent = formatElapsed(elapsedSeconds);
-  }, 1000);
-}
-
-function stopElapsedTimer() {
-  window.clearInterval(state.elapsedTimer);
-  state.elapsedTimer = null;
 }
 
 function removeEmptyState() {
@@ -250,10 +205,4 @@ function formatTimestamp(timestamp) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(timestamp));
-}
-
-function formatElapsed(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-  return `${minutes}:${seconds}`;
 }
