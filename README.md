@@ -45,3 +45,14 @@ Uses `uv` for packages and `just` as task runner.
 ```bash
 just          # list available recipes
 ```
+
+Available recipes:
+
+- `just sync` - install all project extras.
+- `just test` - run pytest through `uv`.
+- `just lint` - run Ruff lint checks.
+- `just format-check` - check Ruff formatting.
+- `just format` - format Python files with Ruff.
+- `just verify-justfile` - validate the justfile formatting and dry-run recipe commands.
+
+Use `just verify-justfile` after editing recipes to confirm the task runner wiring still works without running long-lived commands.

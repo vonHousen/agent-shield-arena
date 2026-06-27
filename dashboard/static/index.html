@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentShield Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="min-h-screen bg-zinc-950 text-zinc-100">
+    <header class="border-b border-zinc-800 bg-zinc-950/95">
+      <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
+        <div>
+          <h1 class="text-lg font-semibold tracking-normal text-white">AgentShield Arena</h1>
+          <p class="text-sm text-zinc-400">Live conversation demo</p>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+          <span id="statusBadge" class="rounded-full border border-zinc-700 px-3 py-1 text-zinc-300">Idle</span>
+          <span id="elapsedTime" class="tabular-nums text-zinc-400">00:00</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto grid max-w-7xl gap-4 px-5 py-5 lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
+      <section class="min-h-[calc(100vh-8rem)] overflow-hidden border border-zinc-800 bg-zinc-900">
+        <div class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Conversation</h2>
+            <p id="eventCount" class="text-sm text-zinc-500">0 events</p>
+          </div>
+          <button
+            id="scrollButton"
+            class="hidden rounded border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
+            type="button"
+          >
+            Latest
+          </button>
+        </div>
+        <div id="conversation" class="conversation-scroll flex h-[calc(100vh-13rem)] flex-col gap-3 overflow-y-auto p-4">
+          <div id="emptyState" class="flex h-full items-center justify-center text-sm text-zinc-500">
+            Waiting for arena events
+          </div>
+        </div>
+      </section>
+
+      <aside class="grid content-start gap-4">
+        <section class="border border-zinc-800 bg-zinc-900 p-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Arena Progress</h2>
+          <div class="mt-4 grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <p class="text-zinc-500">Messages</p>
+              <p id="messageMetric" class="mt-1 text-2xl font-semibold tabular-nums">0</p>
+            </div>
+            <div>
+              <p class="text-zinc-500">Tool Calls</p>
+              <p id="toolCallMetric" class="mt-1 text-2xl font-semibold tabular-nums">0</p>
+            </div>
+            <div>
+              <p class="text-zinc-500">Tool Results</p>
+              <p id="toolResultMetric" class="mt-1 text-2xl font-semibold tabular-nums">0</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="border border-zinc-800 bg-zinc-900 p-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Latest Event</h2>
+          <dl class="mt-4 grid gap-3 text-sm">
+            <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
+              <dt class="text-zinc-500">Type</dt>
+              <dd id="latestType" class="truncate text-zinc-200">None</dd>
+            </div>
+            <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
+              <dt class="text-zinc-500">Timestamp</dt>
+              <dd id="latestTimestamp" class="truncate text-zinc-200">None</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="border border-zinc-800 bg-zinc-900 p-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Tool Activity</h2>
+          <div id="toolActivity" class="mt-4 grid gap-3 text-sm">
+            <p class="text-zinc-500">No tool activity</p>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
