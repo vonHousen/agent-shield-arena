@@ -53,3 +53,7 @@ Available recipes:
 | `just lint` | Run Ruff checks. |
 | `just test` | Run the full pytest suite. |
 | `just test-stream-a` | Run only Shielded System tests. |
+| `just sync` | Install all project extras. |
+| `just format-check` | Check Ruff formatting. |
+| `just format` | Format Python files with Ruff. |
+| `just verify-justfile` | Validate recipe formatting and dry-run recipe commands. |
