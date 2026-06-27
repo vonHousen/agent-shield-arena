@@ -9,6 +9,23 @@ Documentation is in the [docs](docs/) directory. The most important documents ar
 - [Project Brief](docs/01-project-brief.md) - problem statement, terminology, product vision
 - [Design](docs/02-design.md) - architecture, components, arena loop, MVP scope
 
+## Architecture
+
+```text
+shielded_system/        # The agent being protected
+attack_agent/           # Attack generation and memory
+defender_agent/         # Guardrails checkpoints and memory
+evaluator/              # LLM judge
+runner/                 # Arena orchestrator + CLI entry point
+dashboard/
+  src/                  # FastAPI + WebSocket backend
+  static/               # Vanilla JS + Tailwind CDN frontend
+common/                 # LLM client, event system, shared models, config
+data/                   # Git-ignored runtime artifacts (JSONL files, traces)
+```
+
+See [Design Doc — Repository Architecture](docs/02-design.md#9-repository-architecture) for details.
+
 ## Quick Start
 
 ```bash

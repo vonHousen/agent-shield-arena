@@ -338,7 +338,27 @@ Configuration (MVP defaults):
 
 The orchestrator owns the loop but delegates all intelligence to the agents. It is intentionally dumb — a for-loop with logging.
 
-## 9. Storage
+## 9. Repository Architecture
+
+Each system component is a top-level subdirectory with its own `src/` package.
+
+```text
+shielded_system/        # The agent being protected
+attack_agent/           # Attack generation and memory
+defender_agent/         # Guardrails checkpoints and memory
+evaluator/              # LLM judge
+runner/                 # Arena orchestrator + CLI entry point
+dashboard/
+  src/                  # FastAPI + WebSocket backend
+  static/               # Vanilla JS + Tailwind CDN frontend (served by FastAPI)
+common/                 # LLM client, event system, shared models, config
+
+data/                   # Git-ignored runtime artifacts (JSONL files, traces)
+```
+
+Every component depends on `common/`. The dashboard is a separate process — the only integration point between arena and dashboard is the JSONL event file produced by the event system in `common/`.
+
+## 10. Storage
 
 For MVP, use local file-based storage.
 
@@ -377,14 +397,14 @@ No database is required for MVP. Rationale:
 
 If retrieval moves to embedding similarity or the system runs in production with continuous learning, introduce a vector store or database at that point.
 
-## 10. Metrics
+## 11. Metrics
 
 ```text
 attack_success_rate   — % of attacks that succeed (before vs after learning)
 false_positive_rate   — % of benign requests incorrectly blocked
 ```
 
-## 11. MVP Scope
+## 12. MVP Scope
 
 The minimum meaningful demo requires:
 
