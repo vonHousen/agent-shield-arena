@@ -50,10 +50,16 @@ Available recipes:
 
 | Recipe | Command |
 |--------|---------|
+| `just sync` | Install all project extras. |
 | `just lint` | Run Ruff checks. |
 | `just test` | Run the full pytest suite. |
 | `just test-stream-a` | Run only Shielded System tests. |
-| `just sync` | Install all project extras. |
 | `just format-check` | Check Ruff formatting. |
 | `just format` | Format Python files with Ruff. |
+| `just run` | Run the Stream C scenario and write `data/events/arena_events.jsonl`. |
+| `just smoke` | Run Stream C with no delay and verify it emits 12 JSONL events. |
 | `just verify-justfile` | Validate recipe formatting and dry-run recipe commands. |
+
+`just smoke` is the quickest functional check for the Stream C runner. It writes to
+`/tmp/agent-shield-arena-stream-c-smoke.jsonl`, counts the emitted events, and fails
+unless the demo scenario produces the expected 12 events.
