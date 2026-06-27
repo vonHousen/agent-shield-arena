@@ -363,13 +363,3 @@ The minimum meaningful demo requires:
 7. Triage Agent separating memory-level and code-level fixes.
 8. Real-time dashboard (see [03-dashboard-ui-design.md](03-dashboard-ui-design.md)).
 ```
-
-## 12. Risks and Mitigations
-
-| Risk | Mitigation |
-|------|-----------|
-| Demo looks like static rules | Show memory before/after. Show mutated attack blocked because of learned pattern. |
-| Too much scope | Focus on input and tool-call checkpoints. Use local JSON storage. Use fake tools and fake data. |
-| Evaluator is unreliable | Use deterministic checks for business-rule violations where possible. Use LLM judge only for ambiguous semantic cases. |
-| Defender over-blocks benign users | Track benign task success rate. Add at least 3 benign regression scenarios. |
-| Coding agent too hard | Implement coding-agent stub as structured recommendation generator. Do not auto-edit code. |
