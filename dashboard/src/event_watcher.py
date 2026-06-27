@@ -52,6 +52,12 @@ class WatchedEvent:
 
 async def _read_events_from_position(path: Path, position: int) -> AsyncIterator[WatchedEvent]:
     with path.open() as file:
+        file.seek(0, 2)
+        file_size = file.tell()
+
+        if file_size < position:
+            position = 0
+
         file.seek(position)
 
         while line := file.readline():

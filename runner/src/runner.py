@@ -8,11 +8,12 @@ from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
 from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ToolCall, ToolResult
 from runner.src.models import ShieldedSystemResponse
-from runner.src.scenario import get_split_refund_bypass_scenario
+from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
 logger = get_logger(__name__)
 
 DEFAULT_TURN_DELAY_SECONDS = 1.0
+SCENARIO_PAUSE_SECONDS = 2.0
 
 
 class ShieldedSystem(Protocol):
@@ -89,6 +90,38 @@ async def run_default_attack_scenario(
         messages=get_split_refund_bypass_scenario(),
         turn_delay_seconds=turn_delay_seconds,
     )
+
+
+async def run_all_scenarios(
+    shielded_system: ShieldedSystem,
+    event_emitter: EventEmitter,
+    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+) -> dict[str, list[ShieldedSystemResponse]]:
+    """Run every registered attack scenario sequentially.
+
+    Each scenario starts with a fresh conversation history. A short pause
+    separates scenarios so the dashboard can visually distinguish them.
+
+    Args:
+        shielded_system: System under test.
+        event_emitter: Sink for arena events.
+        turn_delay_seconds: Delay between turns for real-time demo pacing.
+    """
+    all_responses: dict[str, list[ShieldedSystemResponse]] = {}
+
+    for name, messages in get_all_scenarios().items():
+        logger.info(f"=== Starting scenario: {name} ===")
+        responses = await run_attack_scenario(
+            shielded_system=shielded_system,
+            event_emitter=event_emitter,
+            messages=messages,
+            turn_delay_seconds=turn_delay_seconds,
+        )
+        all_responses[name] = responses
+        await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+
+    logger.info(f"All {len(all_responses)} scenarios complete")
+    return all_responses
 
 
 def _emit_conversation_turn(event_emitter: EventEmitter, role: Role, content: str) -> None:

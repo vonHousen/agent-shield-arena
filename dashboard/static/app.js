@@ -101,6 +101,9 @@ function appendConversationTurn(payload) {
 }
 
 function appendToolCall(payload) {
+  const row = document.createElement("div");
+  row.className = "message-row message-row-right";
+
   const details = document.createElement("details");
   details.className = "tool-card";
   details.open = true;
@@ -114,11 +117,15 @@ function appendToolCall(payload) {
   code.textContent = JSON.stringify(payload.arguments, null, 2);
 
   details.append(summary, code);
-  appendConversationNode(details);
+  row.append(details);
+  appendConversationNode(row);
   appendToolActivity(`Called ${payload.tool_name}`, payload.arguments);
 }
 
 function appendToolResult(payload) {
+  const row = document.createElement("div");
+  row.className = "message-row message-row-right";
+
   const details = document.createElement("details");
   details.className = "tool-card tool-result";
   details.open = true;
@@ -132,7 +139,8 @@ function appendToolResult(payload) {
   code.textContent = JSON.stringify(payload.result, null, 2);
 
   details.append(summary, code);
-  appendConversationNode(details);
+  row.append(details);
+  appendConversationNode(row);
   appendToolActivity(`Returned from ${payload.tool_name}`, payload.result);
 }
 

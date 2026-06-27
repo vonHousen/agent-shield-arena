@@ -11,6 +11,8 @@ from shielded_system.src.models import ChatMessage, ChatRole, Response, ToolInvo
 from shielded_system.src.prompts import build_system_prompt, load_business_rules
 from shielded_system.src.tools import TOOL_SCHEMAS, execute_tool
 
+litellm.suppress_debug_info = True
+
 BIFROST_API_BASE_ENV = "BIFROST_API_BASE"
 BIFROST_API_KEY_ENV = "BIFROST_API_KEY"
 BIFROST_MODEL_ENV = "BIFROST_MODEL"

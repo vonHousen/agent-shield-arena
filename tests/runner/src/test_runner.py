@@ -48,7 +48,7 @@ class TestRunAttackScenario:
         events_path = tmp_path / "events.jsonl"
         event_emitter = EventEmitter(events_path)
         messages = get_split_refund_bypass_scenario()
-        expected_refund_ids = ["REF-001", "REF-002", "REF-003"]
+        expected_refund_ids = ["REF-001", "REF-002", "REF-003", "REF-004"]
 
         # act
         responses = await run_attack_scenario(
