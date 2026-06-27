@@ -1,0 +1,108 @@
+"""Attack runner loop for the v1 live conversation demo."""
+
+import asyncio
+from collections.abc import Sequence
+from typing import Protocol
+
+from common.src.event_emitter import EventEmitter
+from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ToolCall, ToolResult
+from runner.src.models import ShieldedSystemResponse
+from runner.src.scenario import get_split_refund_bypass_scenario
+
+DEFAULT_TURN_DELAY_SECONDS = 1.0
+
+
+class ShieldedSystem(Protocol):
+    """Chat interface expected by the attack runner."""
+
+    async def chat(self, message: str, history: list[tuple[str, str]]) -> ShieldedSystemResponse:
+        """Return a shielded system response for one user message.
+
+        Args:
+            message: User message sent by the runner.
+            history: Prior conversation turns as role/content tuples.
+        """
+
+
+async def run_attack_scenario(
+    shielded_system: ShieldedSystem,
+    event_emitter: EventEmitter,
+    messages: Sequence[str],
+    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+) -> list[ShieldedSystemResponse]:
+    """Run an attack scenario against a shielded system and emit JSONL events.
+
+    Args:
+        shielded_system: System under test.
+        event_emitter: Sink for arena events.
+        messages: Ordered user messages that make up the attack scenario.
+        turn_delay_seconds: Delay between turns for real-time demo pacing.
+    """
+    history: list[tuple[str, str]] = []
+    responses: list[ShieldedSystemResponse] = []
+
+    for index, message in enumerate(messages):
+        _emit_conversation_turn(event_emitter, Role.USER, message)
+        history.append((Role.USER.value, message))
+
+        response = await shielded_system.chat(message, history)
+        responses.append(response)
+
+        for tool_execution in response.tool_executions:
+            _emit_tool_call(event_emitter, tool_execution.tool_name, tool_execution.arguments)
+            _emit_tool_result(event_emitter, tool_execution.tool_name, tool_execution.result)
+
+        _emit_conversation_turn(event_emitter, Role.ASSISTANT, response.content)
+        history.append((Role.ASSISTANT.value, response.content))
+
+        if index < len(messages) - 1 and turn_delay_seconds > 0:
+            await asyncio.sleep(turn_delay_seconds)
+
+    return responses
+
+
+async def run_default_attack_scenario(
+    shielded_system: ShieldedSystem,
+    event_emitter: EventEmitter,
+    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+) -> list[ShieldedSystemResponse]:
+    """Run the default split-refund bypass scenario.
+
+    Args:
+        shielded_system: System under test.
+        event_emitter: Sink for arena events.
+        turn_delay_seconds: Delay between turns for real-time demo pacing.
+    """
+    return await run_attack_scenario(
+        shielded_system=shielded_system,
+        event_emitter=event_emitter,
+        messages=get_split_refund_bypass_scenario(),
+        turn_delay_seconds=turn_delay_seconds,
+    )
+
+
+def _emit_conversation_turn(event_emitter: EventEmitter, role: Role, content: str) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.CONVERSATION_TURN,
+            payload=ConversationTurn(role=role, content=content),
+        )
+    )
+
+
+def _emit_tool_call(event_emitter: EventEmitter, tool_name: str, arguments: dict[str, object]) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.TOOL_CALL,
+            payload=ToolCall(tool_name=tool_name, arguments=arguments),
+        )
+    )
+
+
+def _emit_tool_result(event_emitter: EventEmitter, tool_name: str, result: object) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.TOOL_RESULT,
+            payload=ToolResult(tool_name=tool_name, result=result),
+        )
+    )

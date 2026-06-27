@@ -45,3 +45,16 @@ Uses `uv` for packages and `just` as task runner.
 ```bash
 just          # list available recipes
 ```
+
+Available recipes:
+
+```bash
+just lint     # run ruff
+just test     # run pytest
+just run      # run the Stream C scenario and write data/events/arena_events.jsonl
+just smoke    # run Stream C with no delay and verify it emits 12 JSONL events
+```
+
+`just smoke` is the quickest functional check for the Stream C runner. It writes to
+`/tmp/agent-shield-arena-stream-c-smoke.jsonl`, counts the emitted events, and fails
+unless the demo scenario produces the expected 12 events.
