@@ -87,5 +87,5 @@ temp/
 *.log
 *.log.*
 
-# docs
-docs/tmp/*
+# temporary files
+**/tmp/*
