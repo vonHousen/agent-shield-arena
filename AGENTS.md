@@ -52,6 +52,17 @@ Runs lint, validation, and tests in sequence — same checks as the GitLab CI pi
 - avoid nested function definitions — extract inner functions to module-level or class methods; closures are acceptable only when they genuinely need to capture enclosing scope variables;
 - avoid using getattr() / setattr() etc. - use direct attribute access instead, as it is safer and easier to maintain;
 - do not overuse `type: ignore` — fix the underlying type issue instead. Only use it when the type checker is genuinely wrong and there's no reasonable way to satisfy it; when used, always add a comment explaining why the ignore is necessary;
+- when implementing any python script to be used using CLI, use `typer`;
+
+### Commit messages
+
+Format: `action(scope): Description.`
+
+- **action** — one of: `add`, `update`, `fix`, `remove`, `implement`, `enhance`.
+- **scope** — the affected component or file in parentheses (e.g. `design`, `.gitignore`, `shared-contract`).
+- **description** — sentence-case, ending with a period; brief explanation of what was done
+- Optionally, add a more detailed explanation after a blank line (`\n\n`) following the subject line.
+- Merge commits use the default `Merge branch '<branch-name>'` format.
 
 ### Designing software
 
