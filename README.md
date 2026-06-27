@@ -45,3 +45,11 @@ Uses `uv` for packages and `just` as task runner.
 ```bash
 just          # list available recipes
 ```
+
+Available recipes:
+
+| Recipe | Command |
+|--------|---------|
+| `just lint` | Run Ruff checks. |
+| `just test` | Run the full pytest suite. |
+| `just test-stream-a` | Run only Shielded System tests. |
