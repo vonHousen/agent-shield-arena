@@ -86,3 +86,6 @@ temp/
 # Log files
 *.log
 *.log.*
+
+# docs
+docs/tmp/*
