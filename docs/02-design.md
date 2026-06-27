@@ -391,10 +391,10 @@ The minimum meaningful demo requires:
 ```text
 1. Shielded System (support agent) with fake tools.
 2. Business rules (plain text).
-3. Attack Agent generating adversarial scenarios.
+3. Attack Agent generating adversarial scenarios (pre-seeded strategies + mutations).
 4. Evaluator judging attack success from traces.
 5. Defender with input and tool-call checkpoints.
 6. Defender memory auto-update.
-7. Triage Agent separating memory-level and code-level fixes.
+7. Event infrastructure (EventEmitter + event models, feeds dashboard and traces).
 8. Real-time dashboard (see [03-dashboard-ui-design.md](03-dashboard-ui-design.md)).
 ```
