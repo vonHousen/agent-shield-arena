@@ -26,7 +26,7 @@ The product lifecycle has two stages:
    Before the Shielded System goes to production, the arena stress-tests it. The Attack Agent probes the Shielded System with increasingly specialized exploits — prompt injections, business-rule bypasses, data exfiltration, role impersonation. Every successful attack teaches the Defender a new generalized pattern. Every failed attack teaches the Attack Agent to try harder. The arena runs iteratively until the Defender is hardened against the specific threats this Shielded System faces.
 
 2. **Production stage: Defender as guardrails**
-   The hardened Defender ships with the Shielded System as its runtime guardrails layer. It intercepts activity at key checkpoints (user input, tool calls, memory writes, outputs), makes allow/block/escalate decisions using the patterns learned in the arena, and continues to learn from any new attacks encountered in production.
+   The hardened Defender ships with the Shielded System as its runtime guardrails layer. It intercepts activity at key checkpoints (user input, tool calls, memory writes, outputs), makes binary allow/block decisions using the patterns learned in the arena, and continues to learn from any new attacks encountered in production.
 
 The result: a Shielded System that arrives in production already hardened against its specific attack surface, with guardrails that keep improving after deployment.
 

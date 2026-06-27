@@ -151,7 +151,14 @@ Memory updates are auto-applied from successful attacks. Code-level changes to t
 
 ### 7.6 Evaluator
 
-Consumes execution traces and determines whether an attack succeeded. Outputs: success/failure, violation type, violated rule, evidence, root cause hint, severity.
+Consumes execution traces and determines whether an attack succeeded. The Evaluator is an LLM judge — it receives the full trace (user input, Defender decisions, Shielded System responses, tool calls and results) and produces a structured verdict.
+
+How it works:
+
+1. Receives the complete trace for a single interaction.
+2. Is given the Shielded System's business rules as context.
+3. Judges whether a business-rule violation or security breach occurred.
+4. Outputs: success/failure, violation type, violated rule, evidence (quoted from trace), severity.
 
 ### 7.7 Triage Agent
 
@@ -303,6 +310,34 @@ Key differences from the arena (8.1, 8.2):
 - **Memory is read-only (MVP)** — the Defender uses patterns learned in the arena but does not update memory from production interactions. Continuous learning from production is post-MVP.
 - **Benign traffic must pass through unaffected** — the Defender must not over-block legitimate requests. This is validated by benign regression tests during the arena.
 
+### 8.4 Arena orchestrator
+
+The arena orchestrator is the top-level loop that drives the adversarial self-play. For MVP, it is a simple sequential script.
+
+```text
+for round in 1..N:
+    1. Attack Agent generates attack set (queries its memory, produces ~10 attacks)
+    2. For each attack in the set (sequentially):
+        a. Send attack to the protected system (Defender + Shielded System)
+        b. Collect the full interaction trace
+        c. Evaluator judges the trace → verdict
+        d. If verdict is SUCCESS:
+            - Triage Agent classifies → memory update or code remediation
+            - Update Defender memory (if Path A)
+            - Log remediation proposal (if Path B)
+        e. Update Attack Agent memory (success or failure signal)
+    3. Compute round metrics (attack_success_rate, false_positive_rate)
+    4. Log round summary
+```
+
+Configuration (MVP defaults):
+
+* `rounds`: 3–5
+* `attacks_per_round`: ~10
+* `benign_scenarios_per_round`: 3 (run after attacks to measure false positives)
+
+The orchestrator owns the loop but delegates all intelligence to the agents. It is intentionally dumb — a for-loop with logging.
+
 ## 9. Storage
 
 For MVP, use local file-based storage.
@@ -336,11 +371,11 @@ data/memory/
 No database is required for MVP. Rationale:
 
 * **Scale is tiny.** The demo targets ~10 attacks per round across 3–5 rounds. Defender memory will hold at most a few dozen entries. Loading an entire JSONL file into memory and scanning it is trivial at this scale.
-* **Retrieval is keyword-based.** The recommended MVP retrieval (keyword + LLM summarization, see section 20) loads all entries, keyword-filters, and passes matches to the LLM. No index or random access needed.
+* **Retrieval is simple.** MVP retrieval loads all entries and passes them to the LLM as context. No index or random access needed.
 * **No concurrent access.** The arena runs attacks sequentially — no parallel reader/writer contention on memory files.
 * **Append-only writes.** Both Defender and Attack Agent memory are append-only during the arena loop. JSONL is a natural fit.
 
-If retrieval moves to embedding similarity or the system runs in production with continuous learning, introduce a vector store or database at that point. To make the transition easy, memory stores should be accessed through a `MemoryStore` protocol (`add_entry()` / `retrieve_relevant()`) so swapping the backend is a one-file change.
+If retrieval moves to embedding similarity or the system runs in production with continuous learning, introduce a vector store or database at that point.
 
 ## 10. Metrics
 
@@ -355,7 +390,7 @@ The minimum meaningful demo requires:
 
 ```text
 1. Shielded System (support agent) with fake tools.
-2. Business rules YAML.
+2. Business rules (plain text).
 3. Attack Agent generating adversarial scenarios.
 4. Evaluator judging attack success from traces.
 5. Defender with input and tool-call checkpoints.
