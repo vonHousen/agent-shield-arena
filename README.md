@@ -34,6 +34,10 @@ uv sync
 uv run pytest
 ```
 
+## Project Layout
+
+Single `pyproject.toml` at the root — all components are top-level packages imported directly (e.g. `from common.src.models import ArenaEvent`). No uv workspace or per-package installs; everything runs from the project root.
+
 ## Development
 
 Uses `uv` for packages and `just` as task runner.
