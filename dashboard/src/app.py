@@ -1,8 +1,8 @@
 """FastAPI dashboard application for live arena events."""
 
-import argparse
 from pathlib import Path
 
+import typer
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -50,16 +50,14 @@ def create_app(events_file: Path = DEFAULT_EVENTS_PATH) -> FastAPI:
 app = create_app()
 
 
-def main() -> None:
+def main(
+    events_file: Path = typer.Option(DEFAULT_EVENTS_PATH, help="JSONL file used as the arena event stream."),
+    host: str = typer.Option(DEFAULT_HOST, help="Host to bind the dashboard server to."),
+    port: int = typer.Option(DEFAULT_PORT, help="Port to bind the dashboard server to."),
+) -> None:
     """Run the dashboard development server."""
-    parser = argparse.ArgumentParser(description="Run the AgentShield arena dashboard.")
-    parser.add_argument("--events-file", type=Path, default=DEFAULT_EVENTS_PATH)
-    parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    args = parser.parse_args()
-
-    uvicorn.run(create_app(args.events_file), host=args.host, port=args.port)
+    uvicorn.run(create_app(events_file), host=host, port=port)
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)

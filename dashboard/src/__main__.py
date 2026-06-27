@@ -1,3 +1,5 @@
+import typer
+
 from dashboard.src.app import main
 
-main()
+typer.run(main)

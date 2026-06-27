@@ -8,6 +8,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "litellm",
     "python-dotenv",
+    "typer>=0.9",
 ]
 
 [project.optional-dependencies]

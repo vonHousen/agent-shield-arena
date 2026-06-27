@@ -1,8 +1,9 @@
 """Write fake arena events for dashboard development."""
 
-import argparse
 import asyncio
 from pathlib import Path
+
+import typer
 
 from common.src.event_emitter import DEFAULT_EVENTS_PATH, EventEmitter
 from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ToolCall, ToolResult
@@ -24,14 +25,12 @@ async def produce_mock_events(path: Path = DEFAULT_EVENTS_PATH, delay_seconds: f
         await asyncio.sleep(delay_seconds)
 
 
-def main() -> None:
-    """Run the mock event producer."""
-    parser = argparse.ArgumentParser(description="Write fake dashboard events to a JSONL file.")
-    parser.add_argument("--events-file", type=Path, default=DEFAULT_EVENTS_PATH)
-    parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_SECONDS)
-    args = parser.parse_args()
-
-    asyncio.run(produce_mock_events(path=args.events_file, delay_seconds=args.delay))
+def main(
+    events_file: Path = typer.Option(DEFAULT_EVENTS_PATH, help="JSONL file to write events into."),
+    delay: float = typer.Option(DEFAULT_DELAY_SECONDS, help="Delay between emitted events."),
+) -> None:
+    """Write fake dashboard events to a JSONL file."""
+    asyncio.run(produce_mock_events(path=events_file, delay_seconds=delay))
 
 
 def _build_mock_events() -> list[ArenaEvent]:
@@ -72,4 +71,4 @@ def _build_mock_events() -> list[ArenaEvent]:
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
