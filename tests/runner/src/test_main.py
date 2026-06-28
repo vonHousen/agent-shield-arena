@@ -193,3 +193,33 @@ class TestMain:
             assert str(error) == f"Unknown mode '{invalid_mode}'. Available: scenario, llm"
         else:
             raise AssertionError("Expected invalid mode to raise an exception.")
+
+    def test_when_no_defender_flag_set_expect_llm_mode_still_runs(self, tmp_path: Path) -> None:
+        """Verify the undefended comparison flag is accepted by the CLI."""
+        # arrange
+        events_dir = tmp_path / "events"
+
+        # act
+        with (
+            patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
+            patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+            patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
+            patch("runner.src.runner.TacticalReflector", lambda: FakeReflector()),
+        ):
+            runner_main.main(
+                events_dir=events_dir,
+                memory_dir=tmp_path / "memory",
+                delay=0,
+                mock=True,
+                mode="llm",
+                rounds=1,
+                no_defender=True,
+                verbose=False,
+                log_file=tmp_path / "arena.log",
+                scenario="all",
+            )
+
+        # assert
+        events = _read_events(events_dir)
+        assert events[0]["event_type"] == "run_started"
+        assert events[-1]["event_type"] == "run_completed"

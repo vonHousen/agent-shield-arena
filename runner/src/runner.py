@@ -28,7 +28,10 @@ from common.src.models import (
     ToolCall,
     ToolResult,
     Trace,
+    TriageDecision,
 )
+from defender_agent.src.defended_system import DefendedSystem, Defender
+from defender_agent.src.memory import DefenderMemoryEntry
 from runner.src.attack_source import AttackSource, LLMAttackSource, MockAttackSource
 from runner.src.models import ArenaResult, RoundResult, ShieldedSystemResponse, StrategyResult
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
@@ -73,6 +76,37 @@ class Reflector(Protocol):
         Args:
             trace: Full conversation and tool execution trace.
             verdict: Evaluator's judgment of whether the attack succeeded.
+        """
+
+
+class DefenderMemory(Protocol):
+    """Defender memory interface used by the arena loop."""
+
+    def append(self, entry: DefenderMemoryEntry) -> None:
+        """Store a learned defender pattern.
+
+        Args:
+            entry: Defender memory entry extracted from triage.
+        """
+
+
+class TriageAgent(Protocol):
+    """Triage interface used by the arena loop."""
+
+    async def triage(
+        self,
+        trace: Trace,
+        verdict: EvaluationVerdict,
+        business_rules: str,
+        reflection: TacticalReflection | None = None,
+    ) -> TriageDecision:
+        """Classify a successful attack into a remediation path.
+
+        Args:
+            trace: Successful attack trace.
+            verdict: Evaluator verdict for the trace.
+            business_rules: Shielded system business rules.
+            reflection: Tactical reflection for the conversation.
         """
 
 
@@ -179,6 +213,9 @@ async def run_arena(
     attack_source_factory: Callable[[AttackStrategy, int], AttackSource] | None = None,
     turn_delay_seconds: float = settings.runner_turn_delay_seconds,
     reflector: Reflector | None = None,
+    defender: Defender | None = None,
+    defender_memory: DefenderMemory | None = None,
+    triage_agent: TriageAgent | None = None,
 ) -> ArenaResult:
     """Run a multi-round arena loop with evaluation and attack memory updates.
 
@@ -194,9 +231,14 @@ async def run_arena(
         attack_source_factory: Optional factory used by tests to provide attack sources.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
         reflector: Tactical reflector for producing actionable feedback per conversation.
+        defender: Optional Defender used to wrap the shielded system.
+        defender_memory: Optional Defender memory receiving triaged patterns.
+        triage_agent: Optional Triage Agent for successful attacks.
     """
     arena_strategies = strategies or SEED_STRATEGIES
     arena_reflector = reflector or TacticalReflector()
+    defended_system = DefendedSystem(shielded_system, defender, event_emitter) if defender is not None else None
+    active_system = defended_system if defended_system is not None else shielded_system
     round_results: list[RoundResult] = []
 
     _emit_run_started(event_emitter, len(arena_strategies))
@@ -210,13 +252,15 @@ async def run_arena(
                 reset_customer_db()
                 history: list[tuple[str, str]] = []
                 attack_source = _attack_source_for_strategy(strategy, round_number, attack_source_factory, memory)
+                if defended_system is not None:
+                    defended_system.consume_block_count()
 
                 memory_context = build_memory_context(strategy, memory)
                 if memory_context:
                     _emit_attack_briefing(event_emitter, strategy.name, round_number, memory_context)
 
                 responses = await run_attack_conversation(
-                    shielded_system=shielded_system,
+                    shielded_system=active_system,
                     event_emitter=event_emitter,
                     attack_source=attack_source,
                     scenario_name=strategy.name,
@@ -236,12 +280,25 @@ async def run_arena(
                 memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict, reflection))
                 _emit_evaluation_verdict(event_emitter, verdict)
                 _emit_attack_reflection(event_emitter, strategy.name, round_number, verdict, reflection)
+                defender_blocks = defended_system.consume_block_count() if defended_system is not None else 0
+                if verdict.success and triage_agent is not None:
+                    await _triage_successful_attack(
+                        triage_agent=triage_agent,
+                        trace=trace,
+                        verdict=verdict,
+                        business_rules=business_rules,
+                        reflection=reflection,
+                        defender_memory=defender_memory,
+                        round_number=round_number,
+                        event_emitter=event_emitter,
+                    )
                 strategy_results.append(
                     StrategyResult(
                         strategy_name=strategy.name,
                         success=verdict.success,
                         trace_id=trace.trace_id,
                         violation_type=verdict.violation_type,
+                        defender_blocks=defender_blocks,
                     )
                 )
 
@@ -400,6 +457,10 @@ def _emit_evaluation_verdict(event_emitter: EventEmitter, verdict: EvaluationVer
     event_emitter.emit(ArenaEvent(event_type=EventType.EVALUATION_VERDICT, payload=verdict))
 
 
+def _emit_triage_decision(event_emitter: EventEmitter, decision: TriageDecision) -> None:
+    event_emitter.emit(ArenaEvent(event_type=EventType.TRIAGE_DECISION, payload=decision))
+
+
 def _emit_conversation_turn(event_emitter: EventEmitter, role: Role, content: str) -> None:
     event_emitter.emit(
         ArenaEvent(
@@ -513,4 +574,49 @@ def _memory_entry_from_verdict(
         reflection=reflection,
         round_number=round_number,
         trace_id=verdict.trace_id,
+    )
+
+
+async def _triage_successful_attack(
+    triage_agent: TriageAgent,
+    trace: Trace,
+    verdict: EvaluationVerdict,
+    business_rules: str,
+    reflection: TacticalReflection | None,
+    defender_memory: DefenderMemory | None,
+    round_number: int,
+    event_emitter: EventEmitter,
+) -> None:
+    triage_decision = await triage_agent.triage(
+        trace=trace,
+        verdict=verdict,
+        business_rules=business_rules,
+        reflection=reflection,
+    )
+    _emit_triage_decision(event_emitter, triage_decision)
+    if triage_decision.remediation_path == "defender_memory" and defender_memory is not None:
+        defender_memory.append(
+            _defender_memory_entry_from_triage(triage_decision, verdict, trace.trace_id, round_number)
+        )
+        return
+    if triage_decision.remediation_path == "code_change":
+        logger.info(
+            f"Triage proposed code remediation for trace {trace.trace_id}: {triage_decision.pattern_description}"
+        )
+
+
+def _defender_memory_entry_from_triage(
+    triage_decision: TriageDecision,
+    verdict: EvaluationVerdict,
+    trace_id: str,
+    round_number: int,
+) -> DefenderMemoryEntry:
+    return DefenderMemoryEntry(
+        attack_intent=triage_decision.pattern_description,
+        violated_rule=verdict.violated_rule,
+        affected_component=triage_decision.affected_component,
+        signals=[triage_decision.rationale],
+        defensive_action=triage_decision.pattern_description,
+        source_trace_id=trace_id,
+        round_number=round_number,
     )

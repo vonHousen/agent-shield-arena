@@ -24,6 +24,10 @@ clear events_dir="data/events" memory_dir="data/memory":
 run rounds="3" events_dir="data/events" memory_dir="data/memory":
     uv run python -m runner.src --rounds {{ rounds }} --events-dir {{ events_dir }} --memory-dir {{ memory_dir }}
 
+# Run the arena without Defender guardrails for comparison.
+run-undefended rounds="3" events_dir="data/events" memory_dir="data/memory":
+    uv run python -m runner.src --rounds {{ rounds }} --events-dir {{ events_dir }} --memory-dir {{ memory_dir }} --no-defender
+
 # Start the live dashboard server (pass 'true' to enable code hot-reload).
 dashboard reload="false":
     uv run python -m dashboard.src {{ if reload == "true" { "--reload" } else { "" } }}
@@ -47,6 +51,7 @@ verify-justfile:
     just --dry-run test
     just --dry-run clear
     just --dry-run run
+    just --dry-run run-undefended
     just --dry-run dashboard
     just --dry-run ci
     just --dry-run pre-commit-install

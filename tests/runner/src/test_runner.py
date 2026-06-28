@@ -8,7 +8,8 @@ from attack_agent.src.agent import AttackOutput
 from attack_agent.src.memory import AttackMemory, TacticalReflection
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EventEmitter
-from common.src.models import EvaluationVerdict, Trace
+from common.src.models import DefenderDecision, EvaluationVerdict, Trace, TriageDecision
+from defender_agent.src.memory import DefenderMemoryEntry
 from runner.src.attack_source import AttackOutput as SourceAttackOutput
 from runner.src.attack_source import ConversationHistory, MockAttackSource
 from runner.src.mock_system import MockShieldedSystem
@@ -91,6 +92,89 @@ class FakeReflector:
             why_outcome="agent enforced identity verification",
             defensive_trigger="identity verification check",
             suggested_mutations=["start as verified user then pivot"],
+        )
+
+
+class RecordingDefender:
+    """Defender test double that allows inputs and blocks refund tool calls."""
+
+    async def on_user_input(self, message: str, conversation_history: ConversationHistory) -> DefenderDecision:
+        """Allow every user message.
+
+        Args:
+            message: User message being evaluated.
+            conversation_history: Prior conversation history.
+        """
+        return DefenderDecision(checkpoint="on_user_input", decision="ALLOW", reason="Allowed by test defender.")
+
+    async def on_tool_call(
+        self,
+        tool_name: str,
+        arguments: dict[str, object],
+        conversation_history: ConversationHistory,
+    ) -> DefenderDecision:
+        """Block refund tool calls and allow everything else.
+
+        Args:
+            tool_name: Tool name being evaluated.
+            arguments: Tool arguments being evaluated.
+            conversation_history: Prior conversation history.
+        """
+        if tool_name == "process_refund":
+            return DefenderDecision(
+                checkpoint="on_tool_call",
+                decision="BLOCK",
+                reason="Refund call matched a learned pattern.",
+                matched_patterns=["def-pattern-1"],
+            )
+        return DefenderDecision(checkpoint="on_tool_call", decision="ALLOW", reason="Tool allowed.")
+
+
+class RecordingDefenderMemory:
+    """Defender memory double that records appended patterns."""
+
+    def __init__(self) -> None:
+        """Initialize empty memory state."""
+        self.entries: list[DefenderMemoryEntry] = []
+
+    def append(self, entry: DefenderMemoryEntry) -> None:
+        """Record a defender memory entry.
+
+        Args:
+            entry: Entry extracted from triage.
+        """
+        self.entries.append(entry)
+
+
+class RecordingTriageAgent:
+    """Triage test double that records successful traces."""
+
+    def __init__(self) -> None:
+        """Initialize recorded triage inputs."""
+        self.calls: list[tuple[Trace, EvaluationVerdict, TacticalReflection | None]] = []
+
+    async def triage(
+        self,
+        trace: Trace,
+        verdict: EvaluationVerdict,
+        business_rules: str,
+        reflection: TacticalReflection | None = None,
+    ) -> TriageDecision:
+        """Return a defender-memory remediation decision.
+
+        Args:
+            trace: Successful attack trace.
+            verdict: Evaluation verdict for the trace.
+            business_rules: Business rules supplied by the runner.
+            reflection: Tactical reflection produced by the runner.
+        """
+        self.calls.append((trace, verdict, reflection))
+        return TriageDecision(
+            trace_id=trace.trace_id,
+            remediation_path="defender_memory",
+            pattern_description="Multiple small refunds below approval threshold on the same order.",
+            affected_component="process_refund",
+            rationale="A tool-call pattern could block the repeated refund sequence.",
         )
 
 
@@ -385,3 +469,51 @@ class TestRunArena:
         ]
         assert len(verdict_events) == expected_conversation_count
         assert len(trace_files) == expected_conversation_count
+
+    async def test_when_defender_and_triage_configured_expect_decisions_and_memory_updates(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify v4 runner wiring emits defender decisions and stores triage patterns."""
+        # arrange
+        events_path = tmp_path / "events" / "arena_events.jsonl"
+        memory_run_dir = tmp_path / "memory" / "20260101_000000"
+        event_emitter = EventEmitter(events_path)
+        memory = AttackMemory(memory_run_dir / "attack_memory.jsonl")
+        defender_memory = RecordingDefenderMemory()
+        triage_agent = RecordingTriageAgent()
+        strategies = [AttackStrategy(name="split-refund", goal="Refund bypass.", opening="Ask for refunds.")]
+
+        # act
+        result = await run_arena(
+            shielded_system=MockShieldedSystem(),
+            event_emitter=event_emitter,
+            evaluator=RecordingEvaluator(),
+            memory=memory,
+            business_rules="1. Refunds above $100 require manager approval.",
+            memory_run_dir=memory_run_dir,
+            rounds=1,
+            strategies=strategies,
+            attack_source_factory=lambda strategy, round_number: MockAttackSource(["refund attack"]),
+            turn_delay_seconds=0,
+            reflector=FakeReflector(),
+            defender=RecordingDefender(),
+            defender_memory=defender_memory,
+            triage_agent=triage_agent,
+        )
+
+        # assert
+        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        defender_events = [event for event in events if event["event_type"] == "defender_decision"]
+        triage_events = [event for event in events if event["event_type"] == "triage_decision"]
+
+        assert len(defender_events) == 2
+        assert [event["payload"]["checkpoint"] for event in defender_events] == ["on_user_input", "on_tool_call"]
+        assert [event["payload"]["decision"] for event in defender_events] == ["ALLOW", "BLOCK"]
+        assert len(triage_events) == 1
+        assert len(triage_agent.calls) == 1
+        assert len(defender_memory.entries) == 1
+        assert defender_memory.entries[0].attack_intent == (
+            "Multiple small refunds below approval threshold on the same order."
+        )
+        assert defender_memory.entries[0].affected_component == "process_refund"
+        assert result.rounds[0].strategy_results[0].defender_blocks == 1
