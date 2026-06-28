@@ -30,6 +30,7 @@ from runner.src.attack_source import AttackSource, LLMAttackSource, MockAttackSo
 from runner.src.models import ArenaResult, RoundResult, ShieldedSystemResponse, StrategyResult
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 from runner.src.trace_builder import build_trace, save_trace
+from shielded_system.src.tools import reset_customer_db
 
 logger = get_logger(__name__)
 
@@ -197,6 +198,7 @@ async def run_arena(
             memory_round_dir = memory_run_dir / f"round_{round_number}"
 
             for strategy in arena_strategies:
+                reset_customer_db()
                 history: list[tuple[str, str]] = []
                 attack_source = _attack_source_for_strategy(strategy, round_number, attack_source_factory, memory)
                 responses = await run_attack_conversation(
