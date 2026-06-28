@@ -1,18 +1,19 @@
-"""Attack runner loop for the v1 live conversation demo."""
+"""Attack runner loop for arena conversations."""
 
 import asyncio
 from collections.abc import Sequence
 from typing import Protocol
 
+from common.src.config import settings
 from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
 from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ScenarioStarted, ToolCall, ToolResult
+from runner.src.attack_source import AttackSource, MockAttackSource
 from runner.src.models import ShieldedSystemResponse
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
 logger = get_logger(__name__)
 
-DEFAULT_TURN_DELAY_SECONDS = 1.0
 SCENARIO_PAUSE_SECONDS = 2.0
 
 
@@ -33,7 +34,8 @@ async def run_attack_scenario(
     event_emitter: EventEmitter,
     messages: Sequence[str],
     scenario_name: str,
-    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+    turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+    max_turns: int = settings.runner_max_turns,
 ) -> list[ShieldedSystemResponse]:
     """Run an attack scenario against a shielded system and emit JSONL events.
 
@@ -43,22 +45,55 @@ async def run_attack_scenario(
         messages: Ordered user messages that make up the attack scenario.
         scenario_name: Identifier for this scenario, emitted as a scenario_started event.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
+        max_turns: Hard ceiling for conversation turns.
+    """
+    return await run_attack_conversation(
+        shielded_system=shielded_system,
+        event_emitter=event_emitter,
+        attack_source=MockAttackSource(messages),
+        scenario_name=scenario_name,
+        turn_delay_seconds=turn_delay_seconds,
+        max_turns=max_turns,
+    )
+
+
+async def run_attack_conversation(
+    shielded_system: ShieldedSystem,
+    event_emitter: EventEmitter,
+    attack_source: AttackSource,
+    scenario_name: str,
+    turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+    max_turns: int = settings.runner_max_turns,
+) -> list[ShieldedSystemResponse]:
+    """Run a dynamic attack conversation and emit JSONL events.
+
+    Args:
+        shielded_system: System under test.
+        event_emitter: Sink for arena events.
+        attack_source: Source asked for each next attacker message.
+        scenario_name: Identifier for this conversation, emitted as a scenario_started event.
+        turn_delay_seconds: Delay between turns for real-time demo pacing.
+        max_turns: Hard ceiling for conversation turns.
     """
     history: list[tuple[str, str]] = []
     responses: list[ShieldedSystemResponse] = []
 
     _emit_scenario_started(event_emitter, scenario_name)
-    logger.info(f"Starting attack scenario '{scenario_name}' with {len(messages)} messages")
+    logger.info(f"Starting attack conversation '{scenario_name}' with max {max_turns} turns")
 
-    for index, message in enumerate(messages):
-        turn = index + 1
-        logger.info("Turn %d/%d — sending user message: %s", turn, len(messages), message.replace("\n", "\\n"))
+    for turn in range(1, max_turns + 1):
+        message = await attack_source.next_message(history)
+        if message is None:
+            logger.info(f"Attack source stopped conversation '{scenario_name}' after {len(responses)} responses")
+            break
+
+        logger.info(f"Turn {turn}/{max_turns} — sending user message: {message.replace('\n', '\\n')}")
         _emit_conversation_turn(event_emitter, Role.USER, message)
         history.append((Role.USER.value, message))
 
         response = await shielded_system.chat(message, history)
         responses.append(response)
-        logger.info("Turn %d/%d — received response: %s", turn, len(messages), response.content.replace("\n", "\\n"))
+        logger.info(f"Turn {turn}/{max_turns} — received response: {response.content.replace('\n', '\\n')}")
 
         for tool_execution in response.tool_executions:
             logger.debug(f"Tool call: {tool_execution.tool_name}({tool_execution.arguments}) → {tool_execution.result}")
@@ -68,17 +103,19 @@ async def run_attack_scenario(
         _emit_conversation_turn(event_emitter, Role.ASSISTANT, response.content)
         history.append((Role.ASSISTANT.value, response.content))
 
-        if index < len(messages) - 1 and turn_delay_seconds > 0:
+        if turn < max_turns and turn_delay_seconds > 0:
             await asyncio.sleep(turn_delay_seconds)
+    else:
+        logger.warning(f"Attack conversation '{scenario_name}' reached max turn ceiling of {max_turns}")
 
-    logger.info(f"Attack scenario finished — {len(responses)} responses collected")
+    logger.info(f"Attack conversation finished — {len(responses)} responses collected")
     return responses
 
 
 async def run_default_attack_scenario(
     shielded_system: ShieldedSystem,
     event_emitter: EventEmitter,
-    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+    turn_delay_seconds: float = settings.runner_turn_delay_seconds,
 ) -> list[ShieldedSystemResponse]:
     """Run the default split-refund bypass scenario.
 
@@ -99,7 +136,7 @@ async def run_default_attack_scenario(
 async def run_all_scenarios(
     shielded_system: ShieldedSystem,
     event_emitter: EventEmitter,
-    turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
+    turn_delay_seconds: float = settings.runner_turn_delay_seconds,
 ) -> dict[str, list[ShieldedSystemResponse]]:
     """Run every registered attack scenario sequentially.
 
