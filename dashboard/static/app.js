@@ -442,6 +442,7 @@ function switchRound(roundFilter) {
   updateActiveScenarioTab();
   rerenderConversation();
   updateVerdictForCurrentScenario();
+  renderAdaptationCard();
   updateMetrics();
   updateHeaderSummary();
 }
@@ -451,6 +452,7 @@ function switchTab(scenarioKey) {
   updateActiveScenarioTab();
   rerenderConversation();
   updateVerdictForCurrentScenario();
+  renderAdaptationCard();
   updateMetrics();
   updateHeaderSummary();
 }
@@ -847,12 +849,29 @@ function renderAdaptationCard() {
     return;
   }
 
+  let visibleReflections = state.reflections;
+  if (state.currentScenario) {
+    const meta = state.scenarioMetadata[state.currentScenario];
+    if (meta) {
+      visibleReflections = state.reflections.filter((r) => r.strategy_name === meta.name);
+    }
+  }
+  if (state.currentRoundFilter !== null) {
+    const maxRound = parseInt(state.currentRoundFilter, 10);
+    visibleReflections = visibleReflections.filter((r) => r.round_number <= maxRound);
+  }
+
+  if (visibleReflections.length === 0) {
+    elements.adaptationCard.classList.add("hidden");
+    return;
+  }
+
   elements.adaptationCard.classList.remove("hidden");
 
-  const strategies = [...new Set(state.reflections.map((r) => r.strategy_name))];
+  const strategies = [...new Set(visibleReflections.map((r) => r.strategy_name))];
 
   for (const strategyName of strategies) {
-    const strategyReflections = state.reflections
+    const strategyReflections = visibleReflections
       .filter((r) => r.strategy_name === strategyName)
       .sort((a, b) => a.round_number - b.round_number);
 
@@ -882,22 +901,31 @@ function renderAdaptationCard() {
       header.textContent = `R${reflection.round_number} ${reflection.success ? "BREACHED" : "DEFENDED"}`;
       entry.append(header);
 
-      const tactic = document.createElement("p");
-      tactic.className = "adaptation-entry-detail";
-      tactic.innerHTML = `<span class="text-zinc-500">Tactic:</span> "${reflection.tactic_used}"`;
-      entry.append(tactic);
+      const tacticLabel = document.createElement("p");
+      tacticLabel.className = "adaptation-entry-detail text-zinc-500";
+      tacticLabel.textContent = "Tactic:";
+      const tacticValue = document.createElement("p");
+      tacticValue.className = "adaptation-entry-detail";
+      tacticValue.textContent = `"${reflection.tactic_used}"`;
+      entry.append(tacticLabel, tacticValue);
 
       if (reflection.success) {
-        const why = document.createElement("p");
-        why.className = "adaptation-entry-detail";
-        why.innerHTML = `<span class="text-zinc-500">Why:</span> ${reflection.why_outcome}`;
-        entry.append(why);
+        const whyLabel = document.createElement("p");
+        whyLabel.className = "adaptation-entry-detail text-zinc-500";
+        whyLabel.textContent = "Why:";
+        const whyValue = document.createElement("p");
+        whyValue.className = "adaptation-entry-detail";
+        whyValue.textContent = reflection.why_outcome;
+        entry.append(whyLabel, whyValue);
       } else {
         if (reflection.defensive_trigger) {
-          const blocked = document.createElement("p");
-          blocked.className = "adaptation-entry-detail";
-          blocked.innerHTML = `<span class="text-zinc-500">Blocked:</span> ${reflection.defensive_trigger}`;
-          entry.append(blocked);
+          const blockedLabel = document.createElement("p");
+          blockedLabel.className = "adaptation-entry-detail text-zinc-500";
+          blockedLabel.textContent = "Blocked:";
+          const blockedValue = document.createElement("p");
+          blockedValue.className = "adaptation-entry-detail";
+          blockedValue.textContent = reflection.defensive_trigger;
+          entry.append(blockedLabel, blockedValue);
         }
 
         if (reflection.suggested_mutations && reflection.suggested_mutations.length > 0) {
