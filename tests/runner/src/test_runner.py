@@ -9,6 +9,7 @@ from attack_agent.src.memory import AttackMemory, TacticalReflection
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EventEmitter
 from common.src.models import EvaluationVerdict, Trace
+from runner.src.attack_source import AttackOutput as SourceAttackOutput
 from runner.src.attack_source import ConversationHistory, MockAttackSource
 from runner.src.mock_system import MockShieldedSystem
 from runner.src.models import ShieldedSystemResponse
@@ -232,6 +233,40 @@ class TestRunAttackConversation:
         # assert
         assert len(responses) == max_turns
         assert shielded_system.messages == ["turn one", "turn two"]
+
+    async def test_when_attack_source_returns_empty_message_expect_runner_stops(self, tmp_path: Path) -> None:
+        """Verify the runner treats an empty-string message the same as None (defense-in-depth)."""
+        # arrange
+        events_path = tmp_path / "events.jsonl"
+        event_emitter = EventEmitter(events_path)
+        shielded_system = RecordingShieldedSystem()
+        attack_source = _EmptyMessageAttackSource()
+
+        # act
+        responses = await run_attack_conversation(
+            shielded_system=shielded_system,
+            event_emitter=event_emitter,
+            attack_source=attack_source,
+            scenario_name="empty_msg_test",
+            turn_delay_seconds=0,
+            max_turns=5,
+        )
+
+        # assert
+        assert len(responses) == 0
+        assert shielded_system.messages == []
+
+
+class _EmptyMessageAttackSource:
+    """Attack source that returns an empty-string message on first call."""
+
+    async def next_message(self, history: ConversationHistory) -> SourceAttackOutput | None:
+        """Return an empty message.
+
+        Args:
+            history: Unused.
+        """
+        return SourceAttackOutput(message="   ", reasoning=None)
 
 
 class FakeAttackAgent:

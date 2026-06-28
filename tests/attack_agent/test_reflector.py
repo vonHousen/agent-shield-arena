@@ -63,12 +63,14 @@ def _reflection_completion(
     why: str = "each amount was below the $100 approval threshold",
     trigger: str | None = None,
     mutations: list[str] | None = None,
+    tactic_achieved_goal: bool = False,
 ) -> dict[str, Any]:
     data = {
         "tactic_used": tactic,
         "why_outcome": why,
         "defensive_trigger": trigger,
         "suggested_mutations": mutations or ["try three-way split"],
+        "tactic_achieved_goal": tactic_achieved_goal,
     }
     return {"choices": [{"message": {"content": json.dumps(data)}}]}
 
@@ -115,6 +117,46 @@ class TestTacticalReflectorReflect:
         # assert
         assert reflection.defensive_trigger == "third-party access check"
         assert reflection.suggested_mutations == ["start as verified user then pivot"]
+
+    @pytest.mark.asyncio
+    async def test_when_tactic_achieved_goal_expect_field_propagated(self) -> None:
+        # arrange
+        llm_client = FakeLLMClient(
+            completions=[
+                _reflection_completion(
+                    tactic="requested $95 refund",
+                    why="refund processed within threshold",
+                    tactic_achieved_goal=True,
+                )
+            ]
+        )
+        reflector = TacticalReflector(llm_client=llm_client)
+
+        # act
+        reflection = await reflector.reflect(trace=_make_trace(), verdict=_make_verdict(success=False))
+
+        # assert
+        assert reflection.tactic_achieved_goal is True
+
+    @pytest.mark.asyncio
+    async def test_when_tactic_did_not_achieve_goal_expect_field_false(self) -> None:
+        # arrange
+        llm_client = FakeLLMClient(
+            completions=[
+                _reflection_completion(
+                    tactic="claimed identity",
+                    why="agent blocked access",
+                    tactic_achieved_goal=False,
+                )
+            ]
+        )
+        reflector = TacticalReflector(llm_client=llm_client)
+
+        # act
+        reflection = await reflector.reflect(trace=_make_trace(), verdict=_make_verdict(success=False))
+
+        # assert
+        assert reflection.tactic_achieved_goal is False
 
     @pytest.mark.asyncio
     async def test_when_null_defensive_trigger_expect_none_in_reflection(self) -> None:

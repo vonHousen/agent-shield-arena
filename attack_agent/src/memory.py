@@ -14,12 +14,15 @@ class TacticalReflection(BaseModel):
         why_outcome: Why the tactic succeeded or failed — what behavior was triggered or bypassed.
         defensive_trigger: Which defensive behavior blocked the attack (None if attack succeeded).
         suggested_mutations: Concrete alternative approaches for the next attempt.
+        tactic_achieved_goal: Whether the tactic operationally achieved its intended effect,
+            regardless of whether a formal business-rule violation was detected.
     """
 
     tactic_used: str
     why_outcome: str
     defensive_trigger: str | None = None
     suggested_mutations: list[str] = Field(default_factory=list)
+    tactic_achieved_goal: bool = False
 
 
 class AttackMemoryEntry(BaseModel):

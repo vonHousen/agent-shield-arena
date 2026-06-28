@@ -134,7 +134,7 @@ async def run_attack_conversation(
 
     for turn in range(1, max_turns + 1):
         attack_output = await attack_source.next_message(conversation_history)
-        if attack_output is None:
+        if attack_output is None or not attack_output.message.strip():
             logger.info(f"Attack source stopped conversation '{scenario_name}' after {len(responses)} responses")
             break
 
