@@ -26,40 +26,33 @@ data/                   # Git-ignored runtime artifacts (JSONL files, traces)
 
 See [Design Doc — Repository Architecture](docs/02-design.md#9-repository-architecture) for details.
 
+Single `pyproject.toml` at the root — all components are top-level packages imported directly (e.g. `from common.src.models import ArenaEvent`). No uv workspace or per-package installs; everything runs from the project root.
+
+## Configuration
+
+All runtime settings live in `common/src/config.py` as a Pydantic Settings class. Values are loaded from a `.env` file (or environment variables).
+
+Usage in code:
+
+```python
+from common.src.config import settings
+
+response = client.chat(model=settings.bifrost_model, ...)
+```
+
 ## Quick Start
 
 ```bash
 cp .env.example .env   # add your API keys
 uv sync
-uv run pytest
+just pre-commit-install
+just <recipe>
 ```
 
-## Project Layout
-
-Single `pyproject.toml` at the root — all components are top-level packages imported directly (e.g. `from common.src.models import ArenaEvent`). No uv workspace or per-package installs; everything runs from the project root.
-
-## Development
-
-Uses `uv` for packages and `just` as task runner.
+Use `just` as task runner (use `just --list` to list all recipes).
 
 ```bash
-just          # list available recipes
+just run         # run the Arena demo → data/events/arena_events.jsonl
+just dashboard   # start the live dashboard (http://127.0.0.1:8080)
+just ci          # full CI pipeline (lint + validate + tests)
 ```
-
-Available recipes:
-
-| Recipe | Command |
-|--------|---------|
-| `just sync` | Install all project extras. |
-| `just lint` | Run Ruff checks. |
-| `just test` | Run the full pytest suite. |
-| `just test-stream-a` | Run only Shielded System tests. |
-| `just format-check` | Check Ruff formatting. |
-| `just format` | Format Python files with Ruff. |
-| `just run` | Run the Stream C scenario and write `data/events/arena_events.jsonl`. |
-| `just smoke` | Run Stream C with no delay and verify it emits 12 JSONL events. |
-| `just verify-justfile` | Validate recipe formatting and dry-run recipe commands. |
-
-`just smoke` is the quickest functional check for the Stream C runner. It writes to
-`/tmp/agent-shield-arena-stream-c-smoke.jsonl`, counts the emitted events, and fails
-unless the demo scenario produces the expected 12 events.
