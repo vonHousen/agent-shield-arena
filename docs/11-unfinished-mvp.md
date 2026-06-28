@@ -8,7 +8,7 @@ Items that were explicitly planned for the MVP scope (per `02-design.md` §12) b
 
 **What it is:** After each round of adversarial attacks, the arena was supposed to send 3 legitimate (non-malicious) user requests through the Defender — e.g. "What's the status of my order?" or "I'd like a refund for my $50 item." The goal is to verify the Defender doesn't over-block: as it learns attack patterns like "refund requests are suspicious," it must still allow genuine refund requests through. Without this, a Defender that blocks everything would score perfectly on attack prevention but be useless in production.
 
-**Design doc requirement:** "benign_scenarios_per_round: 3 (run after attacks to measure false positives)" (§8.4). The design also lists `false_positive_rate` as a core metric (§11) and states "Benign traffic must pass through unaffected — this is validated by benign regression tests during the arena" (§8.3).
+**Original planned requirement:** Run benign scenarios after attacks to measure false positives. Earlier design notes also listed `false_positive_rate` as a core metric and expected benign traffic validation during the arena.
 
 **What's missing:**
 - No catalog of benign user messages to run through the system
@@ -20,7 +20,7 @@ Items that were explicitly planned for the MVP scope (per `02-design.md` §12) b
 
 ## 2. False Positive Rate Metric (not started)
 
-**Design doc requirement:** `false_positive_rate — % of benign requests incorrectly blocked` (§11).
+**Original planned requirement:** `false_positive_rate` — percentage of benign requests incorrectly blocked.
 
 **What's missing:**
 - No `false_positive_rate` computation anywhere in runner or metrics
@@ -31,7 +31,7 @@ Items that were explicitly planned for the MVP scope (per `02-design.md` §12) b
 
 ## 3. Configurable Attacks Per Round (Partially implemented)
 
-**Design doc requirement:** "attacks_per_round: ~10" (§8.4).
+**Original planned requirement:** `attacks_per_round` was expected to be configurable, with roughly 10 attacks per round in the full plan.
 
 **What exists:** The arena runs a fixed 4 strategies per round (the 4 seed strategies from `SEED_STRATEGIES`). There is no `attacks_per_round` configuration parameter.
 
@@ -44,7 +44,7 @@ Items that were explicitly planned for the MVP scope (per `02-design.md` §12) b
 
 ## 4. Pre-execution Tool Blocking (not started)
 
-**Design doc requirement:** Defender checkpoint `on_tool_call` should filter tool calls before execution (§7.4).
+**Original planned requirement:** Defender checkpoint `on_tool_call` should filter tool calls before execution.
 
 **What exists:** Tool-call evaluation runs **post-hoc** — tools execute inside `ShieldedSystem.chat()`, and the Defender evaluates them after the fact. The `DefendedSystem` wrapper sees tool executions only in the response.
 
@@ -57,7 +57,7 @@ Items that were explicitly planned for the MVP scope (per `02-design.md` §12) b
 
 ## 5. Coding Agent Stub Output (Minimal)
 
-**Design doc requirement:** "For MVP, does not modify code. Generates a human-reviewable remediation proposal: affected component, root cause, recommended change, tests to add" (§7.9).
+**Original planned requirement:** Code-change triage would produce a human-reviewable remediation proposal with affected component, root cause, recommended change, and tests to add.
 
 **What exists:** When triage classifies an attack as `code_change`, the runner logs a single line:
 ```python

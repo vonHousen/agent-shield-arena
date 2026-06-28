@@ -8,7 +8,7 @@ Each arena run produces three kinds of persistent artifacts:
 |----------|---------|--------|----------|
 | **Events** | Real-time stream of everything that happens during a run | JSONL (append-only) | Dashboard (live UI) |
 | **Traces** | Structured snapshot of one completed conversation | JSON (one file per conversation) | Evaluator (judge input) |
-| **Memory** | Cumulative log of attack outcomes across rounds | JSONL (append-only) | Attack Agent (prompt enrichment) |
+| **Memory** | Cumulative logs of attack outcomes and learned defender patterns across rounds | JSONL (append-only) | Attack Agent and Defender prompt enrichment |
 
 ### How they relate
 
@@ -80,11 +80,11 @@ Each arena run produces three kinds of persistent artifacts:
 
 ## Memory
 
-**What:** A cumulative JSONL log of attack outcomes — one entry per evaluated conversation recording whether the attack succeeded, which rule was violated, and structured tactical feedback from the reflector.
+**What:** JSONL memory files scoped to one arena run. `attack_memory.jsonl` records one attack outcome per evaluated conversation. `defender_memory.jsonl` records generalized exploit patterns learned from triage when the Defender is enabled.
 
-**Why:** The attack agent reads memory entries for its current strategy to adapt its prompt in subsequent rounds. Tactical reflections provide actionable intelligence: what tactic was tried, why it worked or failed, and what to try next.
+**Why:** The Attack Agent reads attack memory entries for its current strategy to adapt its prompt in subsequent rounds. The Defender reads defender memory entries as known patterns to include in checkpoint prompts. Tactical reflections provide actionable intelligence: what tactic was tried, why it worked or failed, and what to try next.
 
-**Shape:** Each line is an `AttackMemoryEntry` with `entry_id`, `strategy_name`, `success`, `violated_rule`, `affected_component`, `reflection` (a `TacticalReflection` object with `tactic_used`, `why_outcome`, `defensive_trigger`, and `suggested_mutations`), `round_number`, and `trace_id`.
+**Shape:** Each line in `attack_memory.jsonl` is an `AttackMemoryEntry` with `entry_id`, `strategy_name`, `success`, `violated_rule`, `affected_component`, `reflection` (a `TacticalReflection` object with `tactic_used`, `why_outcome`, `defensive_trigger`, and `suggested_mutations`), `round_number`, and `trace_id`. Each line in `defender_memory.jsonl` is a `DefenderMemoryEntry` with generalized attack intent, signals, defensive action, source trace, and round number.
 
 **Key property:** Memory grows across rounds within a single run. Round 2 reads entries from round 1; round 3 reads entries from rounds 1 and 2. This is the self-improvement mechanism.
 
@@ -150,6 +150,10 @@ The [`event_watcher`](../dashboard/src/event_watcher.py) tails the JSONL file, r
 The [`AttackAgent`](../attack_agent/src/agent.py) receives an `AttackMemory` instance at construction. When building its system prompt, it calls `memory.get_by_strategy(strategy_name)` and formats prior tactical reflections into the prompt — including what tactic was used, why it worked or failed, and defensive triggers encountered. Suggested mutations are always shown for failed attacks. For successful attacks, mutations are only shown when `mutate_successful_attacks=True` (default: `False`), so successful tactics are repeated as-is by default.
 
 Note: memory enriches the Attack Agent's *prompt* (what tactics to try), but strategy *selection* (which strategies run each round) currently uses the fixed set of 4 seed strategies in order. A `MemoryDrivenStrategySelector` exists in code but is not wired into the runner.
+
+### Memory → Defender
+
+The [`Defender`](../defender_agent/src/defender.py) receives a `DefenderMemory` instance when defender mode is enabled. Before Round 2+ conversations, the runner emits a `defender_briefing` event when defender memory exists, and the Defender formats all learned patterns into its checkpoint prompts. The MVP uses full-scan JSONL retrieval.
 
 ## CLI recipes
 

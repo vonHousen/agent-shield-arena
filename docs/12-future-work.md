@@ -34,7 +34,7 @@ Items from the full product vision (`01-project-brief.md`, `02-design.md`) that 
 
 ## 3. Coding Agent (Automated Remediation)
 
-**Full vision:** The Coding Agent "generates a human-reviewable remediation proposal: affected component, root cause, recommended change, tests to add" (§7.9). The architecture diagram shows it improving the Shielded System based on triage `code_change` decisions.
+**Full vision:** Code-change triage generates a human-reviewable remediation proposal: affected component, root cause, recommended change, and tests to add. The architecture diagram shows future structural fixes improving the Shielded System based on triage `code_change` decisions.
 
 **MVP simplification:** No `coding_agent/` directory exists. Triage `code_change` results are logged only. The design doc explicitly lists "Full autonomous coding-agent implementation" as a non-goal (§4).
 

@@ -90,12 +90,12 @@ Shows the defender's learning journey across rounds:
 
 ### 4.1 Event Store
 
-All arena events are appended to `data/events/arena_events.jsonl`. Each line is a JSON object with at minimum:
+Each arena run writes events to a timestamped JSONL file at `data/events/{YYYYMMDD_HHMMSS}/arena_events.jsonl`, with `data/events/latest` pointing at the newest run. Each line is a JSON object with at minimum:
 
 ```python
 class ArenaEvent(BaseModel):
     event_id: str
-    type: ArenaEventType
+    event_type: ArenaEventType
     timestamp: datetime
     payload: dict
 ```
@@ -120,7 +120,7 @@ class ArenaEvent(BaseModel):
 | `attack_briefing` | strategy_name, round_number, memory_context | Before Round 2+ conversations |
 | `attacker_reasoning` | strategy_name, turn_number, reasoning | Each attacker turn |
 | `triage_decision` | remediation_path, pattern_description, affected_component, rationale | Successful attack triaged |
-| `content_filter` | source, message | Provider content policy hit |
+| `content_filter` | source, scenario_name, turn_number, message | Provider content policy hit |
 
 ### 4.3 EventEmitter
 
@@ -153,7 +153,7 @@ Arena Runner
   │
   ├── emitter.emit(event)
   │       │
-  │       └── appends JSON line to data/events/arena_events.jsonl
+  │       └── appends JSON line to data/events/{timestamp}/arena_events.jsonl
   │
 Dashboard (separate process)
   │
@@ -196,7 +196,7 @@ If the event file does not exist when the dashboard starts (no experiment has ru
 
 ### 6.1 WebSocket Connection
 
-`app.js` connects to `ws://<host>:<port>/ws` on page load. On message receive, it parses the JSON and dispatches based on `event.type`:
+`app.js` connects to `ws://<host>:<port>/ws?run=<run_id>` on page load. On message receive, it parses the JSON and dispatches based on `event.event_type`. A special dashboard reset message uses `{"type": "reset"}` and is handled before arena-event dispatch:
 
 | Event Type | UI Action |
 |---|---|
@@ -230,23 +230,23 @@ The two-column layout collapses to stacked on small screens (Tailwind responsive
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run python -m dashboard.src
+just dashboard
 
 # Terminal 2: Run the arena experiment (emits events to data/events/{timestamp}/)
-uv run python -m runner.src
+just run
 ```
 
 The dashboard can be started before, during, or after the arena run. It replays past events on connect and tails for new ones.
 
 ## 8. Dependencies
 
-New dependencies required:
+Dashboard dependencies:
 
 | Package | Purpose |
 |---|---|
 | `fastapi` | Web framework, WebSocket support |
-| `uvicorn` | ASGI server for FastAPI |
-| `aiofiles` | Async file reading for event watcher |
+| `uvicorn[standard]` | ASGI server for FastAPI |
+| `websockets` | WebSocket support |
 
 Frontend dependencies (CDN, no install):
 

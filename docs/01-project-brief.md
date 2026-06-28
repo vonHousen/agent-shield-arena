@@ -18,7 +18,11 @@ Existing guardrail systems are static. They are configured once against general 
 
 **AgentShield** is an adaptive guardrails system for any customer-facing AI agent.
 
+> Implementation note: In the current MVP, user input is handled before the Shielded System responds; tool calls are evaluated after execution and recorded as would-block signals.
+
 It is not a static filter. It is a self-improving defense layer that directly protects the Shielded System at runtime — intercepting inputs, tool calls, and outputs.
+
+> Implementation note: The current MVP protects the arena path with input filtering and post-hoc tool-call analysis. Pre-execution tool-call blocking, output filtering, and production middleware are future work.
 
 The product lifecycle has two stages:
 
@@ -28,7 +32,11 @@ The product lifecycle has two stages:
 2. **Production stage: Defender as guardrails**
    The hardened Defender ships with the Shielded System as its runtime guardrails layer. It intercepts activity at key checkpoints (user input, tool calls, memory writes, outputs), makes binary allow/block decisions using the patterns learned in the arena, and continues to learn from any new attacks encountered in production.
 
+> Implementation note: This is future product direction. The current codebase is arena-only and does not include production deployment or continuous production learning.
+
 The result: a Shielded System that arrives in production already hardened against its specific attack surface, with guardrails that keep improving after deployment.
+
+> Implementation note: The current MVP demonstrates the arena learning loop before that production deployment path exists.
 
 ## Core thesis
 
@@ -62,6 +70,8 @@ The Defender improves by:
 * distinguishing between attacks that require memory updates and attacks that expose structural flaws.
 
 The system as a whole improves because each round creates better attacks and better defenses.
+
+> Implementation note: The current MVP implements input checkpointing and post-hoc tool-call analysis. Memory and output checkpoints are future work.
 
 ## Example
 
@@ -102,3 +112,5 @@ In development, the arena hardens the Defender against the Shielded System's spe
 In production, the Defender IS the guardrails — it directly protects the Shielded System at runtime with everything it learned.
 
 We make customer-facing AI agents measurably harder to exploit before they go live, and the protection keeps improving after deployment.
+
+> Implementation note: The current codebase proves the arena loop and defender-memory flow. Production deployment and continuous post-deployment learning are future work.

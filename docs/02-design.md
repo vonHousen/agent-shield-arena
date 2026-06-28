@@ -6,6 +6,8 @@
 
 It hardens a Defender through adversarial self-play in development (the Arena), then deploys that Defender as the runtime guardrails layer in production. The Defender IS the guardrails — not a meta-layer on top of other guardrails.
 
+> Implementation note: The current codebase is arena-only. Packaging the hardened Defender as production runtime guardrails is future product work.
+
 The framework targets two classes of failures:
 
 1. **Universal LLM/agent vulnerabilities** — prompt injection, jailbreaks, system prompt extraction, data exfiltration, unsafe tool use, RAG/context injection, memory poisoning, inter-agent instruction smuggling.
@@ -33,6 +35,8 @@ Production agents have a more specific attack surface. They have:
 The same generic guardrail may not protect two different agents equally well.
 
 AgentShield treats security as an adaptive loop. In the Arena, the Attack Agent probes the Shielded System as a black-box and learns how it fails. The Defender learns generalized patterns from those failures. The Triage Agent decides whether the issue is a runtime recognition failure or a structural flaw requiring code/workflow remediation. The hardened Defender then ships as the Shielded System's runtime guardrails in production.
+
+> Implementation note: Shipping the hardened Defender as production runtime guardrails is future product work.
 
 ## 3. Goals
 
@@ -114,6 +118,8 @@ flowchart LR
 
 ![Production Runtime](assets/runtime-diagram.svg)
 
+> Implementation note: The runtime diagram shows intended production architecture, not implemented runtime middleware.
+
 ## 7. Components
 
 ### 7.1 Shielded System
@@ -150,12 +156,16 @@ The runtime guardrails for the Shielded System — a filter at sensitive checkpo
 
 Checkpoints: `on_user_input`, `on_tool_call` (MVP). Optional: `on_retrieved_context`, `on_agent_plan`, `on_memory_write`, `on_inter_agent_message`, `on_final_output`.
 
+> Implementation note: In the current implementation, `on_user_input` runs before the Shielded System responds, while `on_tool_call` runs post-hoc after the Shielded System has already executed tools and returned `tool_executions`.
+
 At each checkpoint receives: current event, conversation state, tool context, Defender memory, previous trace. Optionally also business rules if provided.
 
 Primary output is binary: **BLOCK** or **ALLOW**. The action taken on a BLOCK depends on the configured `defender_input_mode`:
 
 - **tip** (default): the Defender's analysis is injected as a security advisory into the Shielded System's context via a `security_tip` parameter on the ShieldedSystem's `chat()` interface, letting it respond naturally while being warned about the threat. The Shielded System is still called.
 - **block** (legacy): the Shielded System is prevented from responding entirely; a canned rejection is returned.
+
+> Implementation note: Tool-call decisions currently replace the recorded tool result with a blocked result when the Defender returns `BLOCK`, but they do not prevent the underlying tool from executing. True pre-execution tool-call blocking requires a tool-filter hook in the Shielded System and is tracked as future work.
 
 ### 7.5 Defender Memory
 
@@ -208,6 +218,8 @@ flowchart TD
 ### 7.9 Coding Agent Stub
 
 For MVP, does not modify code. Generates a human-reviewable remediation proposal: affected component, root cause, recommended change, tests to add.
+
+> Implementation note: The current implementation logs the triage pattern description for `code_change` decisions. Structured remediation proposals with affected component, root cause, recommended change, and tests to add are future work.
 
 ## 8. Execution Flow
 
@@ -299,6 +311,8 @@ The key asymmetry: the Attack Agent learns from both successes and failures. The
 
 In production, the Attack Agent and Evaluator are gone. The Defender sits in front of the Shielded System with the memory it built during the arena and guards real user interactions. Every request passes through the same checkpoint pipeline — input first, then each tool call individually.
 
+> Implementation note: This section describes intended production runtime behavior. The production wrapper is not implemented in the current codebase; the current arena uses post-hoc tool-call analysis.
+
 ```mermaid
 flowchart TD
     User([User]) -->|request| InputCk{"on_user_input\nBLOCK or ALLOW?"}
@@ -339,6 +353,8 @@ Key differences from the arena (8.1, 8.2):
 - **All interactions are traced** — every request (blocked or allowed) is logged for offline analysis. Traces can be fed back into the arena to discover new attack patterns and further refine the Defender.
 - **Memory is read-only (MVP)** — the Defender uses patterns learned in the arena but does not update memory from production interactions. Continuous learning from production is post-MVP.
 - **Benign traffic must pass through unaffected** — the Defender must not over-block legitimate requests. This is validated by benign regression tests during the arena.
+
+> Implementation note: Production middleware would need true pre-execution interception for tool calls. The current arena implementation only provides post-hoc tool-call analysis. Benign regression testing is planned but not implemented in the current arena loop.
 
 ### 8.4 Arena orchestrator
 
@@ -426,6 +442,8 @@ attack_success_rate   — % of attacks that succeed (before vs after learning)
 false_positive_rate   — % of benign requests incorrectly blocked
 ```
 
+> Implementation note: `false_positive_rate` is planned but not computed by the current runner or dashboard.
+
 ## 12. MVP Scope
 
 The minimum meaningful demo requires:
@@ -440,3 +458,5 @@ The minimum meaningful demo requires:
 7. Event infrastructure (EventEmitter + event models, feeds dashboard and traces).
 8. Real-time dashboard (see [03-dashboard-ui-design.md](03-dashboard-ui-design.md)).
 ```
+
+> Implementation note: The current MVP has input checkpointing and post-hoc tool-call analysis. True pre-execution tool-call blocking is future work.
