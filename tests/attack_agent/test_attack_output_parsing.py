@@ -12,26 +12,40 @@ def _completion(content: str) -> dict:
     return {"choices": [{"message": {"role": "assistant", "content": content}}]}
 
 
-class TestParseDecision:
-    def test_when_message_action_expect_output_with_message(self) -> None:
+class TestParseDecisionFirstTurn:
+    def test_when_valid_first_turn_expect_output_with_message(self) -> None:
         # arrange
-        completion = _completion(json.dumps({"action": "message", "message": MESSAGE_TEXT}))
+        payload = {"reasoning": REASONING_TEXT, "message": MESSAGE_TEXT}
+        completion = _completion(json.dumps(payload))
 
         # act
-        result = _parse_decision(completion)
+        result = _parse_decision(completion, is_first_turn=True)
 
         # assert
         assert result is not None
         assert result.message == MESSAGE_TEXT
-        assert result.reasoning is None
+        assert result.reasoning == REASONING_TEXT
 
-    def test_when_message_with_reasoning_expect_both_fields(self) -> None:
+    def test_when_empty_message_on_first_turn_expect_none(self) -> None:
         # arrange
-        payload = {"action": "message", "message": MESSAGE_TEXT, "reasoning": REASONING_TEXT}
+        payload = {"reasoning": REASONING_TEXT, "message": "  "}
         completion = _completion(json.dumps(payload))
 
         # act
-        result = _parse_decision(completion)
+        result = _parse_decision(completion, is_first_turn=True)
+
+        # assert
+        assert result is None
+
+
+class TestParseDecisionSubsequentTurn:
+    def test_when_message_action_expect_output_with_message(self) -> None:
+        # arrange
+        payload = {"reasoning": REASONING_TEXT, "action": "message", "message": MESSAGE_TEXT}
+        completion = _completion(json.dumps(payload))
+
+        # act
+        result = _parse_decision(completion, is_first_turn=False)
 
         # assert
         assert result is not None
@@ -40,31 +54,22 @@ class TestParseDecision:
 
     def test_when_stop_action_expect_none(self) -> None:
         # arrange
-        completion = _completion(json.dumps({"action": "stop"}))
-
-        # act
-        result = _parse_decision(completion)
-
-        # assert
-        assert result is None
-
-    def test_when_stop_with_reasoning_expect_none(self) -> None:
-        # arrange
-        payload = {"action": "stop", "reasoning": "No viable approach left."}
+        payload = {"reasoning": "No viable approach left.", "action": "stop", "message": "Nothing to try."}
         completion = _completion(json.dumps(payload))
 
         # act
-        result = _parse_decision(completion)
+        result = _parse_decision(completion, is_first_turn=False)
 
         # assert
         assert result is None
 
-    def test_when_empty_message_expect_none(self) -> None:
+    def test_when_empty_message_on_subsequent_turn_expect_none(self) -> None:
         # arrange
-        completion = _completion(json.dumps({"action": "message", "message": "  "}))
+        payload = {"reasoning": REASONING_TEXT, "action": "message", "message": "  "}
+        completion = _completion(json.dumps(payload))
 
         # act
-        result = _parse_decision(completion)
+        result = _parse_decision(completion, is_first_turn=False)
 
         # assert
         assert result is None

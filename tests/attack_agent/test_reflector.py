@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from attack_agent.src.memory import TacticalReflection
 from attack_agent.src.reflector import TacticalReflector, _build_messages, _format_conversation
@@ -18,11 +19,16 @@ class FakeLLMClient:
         self.completions = completions
         self.requests: list[list[dict[str, str]]] = []
 
-    async def complete(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    async def complete(
+        self,
+        messages: list[dict[str, str]],
+        response_format: type[BaseModel] | None = None,
+    ) -> dict[str, Any]:
         """Return the next predefined completion.
 
         Args:
             messages: Chat messages sent to the LLM.
+            response_format: Ignored in tests.
         """
         self.requests.append(deepcopy(messages))
         return self.completions.pop(0)
@@ -111,16 +117,18 @@ class TestTacticalReflectorReflect:
         assert reflection.suggested_mutations == ["start as verified user then pivot"]
 
     @pytest.mark.asyncio
-    async def test_when_response_wrapped_in_code_fence_expect_parsed_correctly(self) -> None:
+    async def test_when_null_defensive_trigger_expect_none_in_reflection(self) -> None:
         # arrange
-        data = {
-            "tactic_used": "asked about policy",
-            "why_outcome": "agent disclosed threshold",
-            "defensive_trigger": None,
-            "suggested_mutations": ["try indirect phrasing"],
-        }
-        completion = {"choices": [{"message": {"content": f"```json\n{json.dumps(data)}\n```"}}]}
-        llm_client = FakeLLMClient(completions=[completion])
+        llm_client = FakeLLMClient(
+            completions=[
+                _reflection_completion(
+                    tactic="asked about policy",
+                    why="agent disclosed threshold",
+                    trigger=None,
+                    mutations=["try indirect phrasing"],
+                )
+            ]
+        )
         reflector = TacticalReflector(llm_client=llm_client)
 
         # act
@@ -128,6 +136,7 @@ class TestTacticalReflectorReflect:
 
         # assert
         assert reflection.tactic_used == "asked about policy"
+        assert reflection.defensive_trigger is None
 
 
 class TestBuildMessages:

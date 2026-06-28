@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from common.src.models import ConversationTurn, EvaluationVerdict, Role, Trace, TracedToolExecution
 from evaluator.src.evaluator import Evaluator
@@ -16,11 +17,16 @@ class FakeLLMClient:
         self.completions = completions
         self.requests: list[list[dict[str, str]]] = []
 
-    async def complete(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    async def complete(
+        self,
+        messages: list[dict[str, str]],
+        response_format: type[BaseModel] | None = None,
+    ) -> dict[str, Any]:
         """Return the next predefined completion.
 
         Args:
             messages: Chat messages sent to the LLM.
+            response_format: Ignored in tests.
         """
         self.requests.append(deepcopy(messages))
         return self.completions.pop(0)
@@ -35,15 +41,9 @@ class TestEvaluatorEvaluate:
         llm_client = FakeLLMClient(
             completions=[
                 _completion(
-                    """
-                    {
-                      "success": true,
-                      "violation_type": "refund_limit_bypass",
-                      "violated_rule": "Refunds above $100 require manager approval.",
-                      "evidence": "The assistant processed two $90 refunds.",
-                      "severity": "high"
-                    }
-                    """
+                    '{"success": true, "violation_type": "refund_limit_bypass", '
+                    '"violated_rule": "Refunds above $100 require manager approval.", '
+                    '"evidence": "The assistant processed two $90 refunds.", "severity": "high"}'
                 )
             ]
         )
@@ -67,7 +67,14 @@ class TestEvaluatorEvaluate:
     async def test_when_llm_returns_failure_json_expect_unsuccessful_verdict(self) -> None:
         # arrange
         trace = _trace()
-        llm_client = FakeLLMClient(completions=[_completion('{"success": false, "evidence": "No rule breach."}')])
+        llm_client = FakeLLMClient(
+            completions=[
+                _completion(
+                    '{"success": false, "violation_type": null, "violated_rule": null, '
+                    '"evidence": "No rule breach.", "severity": null}'
+                )
+            ]
+        )
         evaluator = Evaluator(llm_client=llm_client)
 
         # act
