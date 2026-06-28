@@ -3,13 +3,12 @@ const ALL_FILTER = "all";
 
 const state = {
   events: 0,
-  currentScenario: ALL_FILTER,
-  currentRoundFilter: ALL_FILTER,
+  currentScenario: null,
+  currentRoundFilter: null,
   currentRoundNumber: null,
   activeScenarioKey: null,
   scenarioEvents: { [ALL_FILTER]: [] },
   scenarioEmptyPlaceholder: null,
-  lastRenderedRound: null,
 
   rounds: [],
   roundVerdicts: {},
@@ -38,8 +37,7 @@ const elements = {
   messageMetric: document.querySelector("#messageMetric"),
   toolCallMetric: document.querySelector("#toolCallMetric"),
   successRateMetric: document.querySelector("#successRateMetric"),
-  latestType: document.querySelector("#latestType"),
-  latestTimestamp: document.querySelector("#latestTimestamp"),
+  verdictCard: document.querySelector("#verdictCard"),
   runSelector: document.querySelector("#runSelector"),
   roundComparisonCard: document.querySelector("#roundComparisonCard"),
   roundComparison: document.querySelector("#roundComparison"),
@@ -156,8 +154,6 @@ function renderEvent(event) {
   state.events += 1;
 
   event.roundNumber = state.currentRoundNumber;
-  elements.latestType.textContent = event.event_type;
-  elements.latestTimestamp.textContent = formatTimestamp(event.timestamp);
 
   if (event.event_type === "run_started") {
     setStatus("Running", "running");
@@ -196,6 +192,10 @@ function handleRoundStarted(payload) {
     state.rounds.push(payload.round_number);
     state.roundVerdicts[payload.round_number] = { pass: 0, fail: 0, total: payload.strategy_count };
     addRoundButton(payload.round_number);
+
+    if (state.rounds.length === 1) {
+      switchRound(String(payload.round_number));
+    }
   }
 }
 
@@ -320,10 +320,12 @@ function handleScenarioStarted(payload) {
   tab.dataset.scenario = scenarioKey;
   tab.dataset.round = roundNumber === null ? "" : String(roundNumber);
 
+  const dot = document.createElement("span");
+  dot.className = "round-dot round-dot-running";
+
   const label = document.createElement("span");
-  const prefix = roundNumber !== null ? `R${roundNumber}: ` : "";
-  label.textContent = prefix + humanizeName(payload.scenario_name);
-  tab.append(label);
+  label.textContent = humanizeName(payload.scenario_name);
+  tab.append(dot, label);
   elements.scenarioTabs.append(tab);
 
   updateScenarioTabVisibility();
@@ -383,7 +385,7 @@ function handleEvaluationVerdict(event) {
     updateScenarioTabVerdict(state.activeScenarioKey, event.payload);
   }
 
-  renderIfVisible(event, appendEvaluationVerdict);
+  updateVerdictCard(event.payload);
 }
 
 function incrementMetric(metric) {
@@ -395,10 +397,6 @@ function incrementMetric(metric) {
 
 function renderIfVisible(event, renderFunction) {
   if (shouldRenderEvent(event)) {
-    if (state.currentScenario === ALL_FILTER && event.roundNumber !== state.lastRenderedRound) {
-      appendRoundHeader(event.roundNumber);
-      state.lastRenderedRound = event.roundNumber;
-    }
     renderFunction(event.payload);
   }
 }
@@ -408,9 +406,6 @@ function shouldRenderEvent(event) {
     return false;
   }
 
-  if (state.currentScenario === ALL_FILTER) {
-    return true;
-  }
   return state.currentScenario === state.activeScenarioKey;
 }
 
@@ -419,12 +414,14 @@ function switchRound(roundFilter) {
   updateRoundButtons();
   updateScenarioTabVisibility();
 
-  if (state.currentScenario !== ALL_FILTER && !scenarioMatchesRoundFilter(state.currentScenario)) {
-    state.currentScenario = ALL_FILTER;
+  if (!state.currentScenario || !scenarioMatchesRoundFilter(state.currentScenario)) {
+    const firstVisible = elements.scenarioTabs.querySelector(".scenario-tab:not(.hidden)");
+    state.currentScenario = firstVisible ? firstVisible.dataset.scenario : null;
   }
 
   updateActiveScenarioTab();
   rerenderConversation();
+  updateVerdictForCurrentScenario();
   updateMetrics();
   updateHeaderSummary();
 }
@@ -433,8 +430,18 @@ function switchTab(scenarioKey) {
   state.currentScenario = scenarioKey;
   updateActiveScenarioTab();
   rerenderConversation();
+  updateVerdictForCurrentScenario();
   updateMetrics();
   updateHeaderSummary();
+}
+
+function updateVerdictForCurrentScenario() {
+  const meta = state.scenarioMetadata[state.currentScenario];
+  if (meta && meta.verdict) {
+    updateVerdictCard(meta.verdict);
+  } else {
+    clearVerdictCard();
+  }
 }
 
 function updateRoundButtons() {
@@ -445,11 +452,6 @@ function updateRoundButtons() {
 
 function updateScenarioTabVisibility() {
   elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => {
-    if (tab.dataset.scenario === ALL_FILTER) {
-      tab.classList.remove("hidden");
-      return;
-    }
-
     tab.classList.toggle("hidden", !scenarioMatchesRoundFilter(tab.dataset.scenario));
   });
 }
@@ -464,6 +466,11 @@ function updateScenarioTabVerdict(scenarioKey, verdict) {
   const tab = elements.scenarioTabs.querySelector(`[data-scenario="${scenarioKey}"]`);
   if (!tab) {
     return;
+  }
+
+  const dot = tab.querySelector(".round-dot");
+  if (dot) {
+    dot.className = verdict.success ? "round-dot round-dot-breached" : "round-dot round-dot-defended";
   }
 
   const existing = tab.querySelector(".tab-verdict");
@@ -482,7 +489,6 @@ function updateScenarioTabVerdict(scenarioKey, verdict) {
 function rerenderConversation() {
   elements.conversation.innerHTML = "";
   state.scenarioEmptyPlaceholder = null;
-  state.lastRenderedRound = null;
 
   const events = filteredEventsForCurrentView();
 
@@ -495,24 +501,15 @@ function rerenderConversation() {
     return;
   }
 
-  let renderedRound = null;
   for (const event of events) {
-    if (state.currentScenario === ALL_FILTER && event.roundNumber !== renderedRound) {
-      appendRoundHeader(event.roundNumber);
-      renderedRound = event.roundNumber;
-    }
-
     if (event.event_type === "conversation_turn") {
       appendConversationTurn(event.payload);
     } else if (event.event_type === "tool_call") {
       appendToolCall(event.payload);
     } else if (event.event_type === "tool_result") {
       appendToolResult(event.payload);
-    } else if (event.event_type === "evaluation_verdict") {
-      appendEvaluationVerdict(event.payload);
     }
   }
-  state.lastRenderedRound = renderedRound;
 
   scrollConversationToBottom();
 }
@@ -520,27 +517,6 @@ function rerenderConversation() {
 function filteredEventsForCurrentView() {
   const events = state.scenarioEvents[state.currentScenario] || [];
   return events.filter((event) => eventMatchesRoundFilter(event.roundNumber));
-}
-
-function appendRoundHeader(roundNumber) {
-  const header = document.createElement("div");
-  header.className = "round-header";
-
-  if (roundNumber === null) {
-    header.textContent = "No round";
-  } else {
-    let text = `Round ${roundNumber}`;
-    const rv = state.roundVerdicts[roundNumber];
-    if (rv) {
-      const evaluated = rv.pass + rv.fail;
-      if (evaluated > 0) {
-        text += ` \u2014 ${rv.fail}/${evaluated} defended`;
-      }
-    }
-    header.textContent = text;
-  }
-
-  appendConversationNode(header);
 }
 
 function appendConversationTurn(payload) {
@@ -606,24 +582,6 @@ function appendToolResult(payload) {
   appendConversationNode(row);
 }
 
-function appendEvaluationVerdict(payload) {
-  const banner = document.createElement("section");
-  banner.className = payload.success
-    ? "verdict-banner verdict-banner-success"
-    : "verdict-banner verdict-banner-failure";
-
-  const title = document.createElement("p");
-  title.className = "verdict-title";
-  title.textContent = payload.success ? "Evaluation verdict: attack succeeded" : "Evaluation verdict: attack failed";
-
-  const details = document.createElement("p");
-  details.className = "verdict-text";
-  details.textContent = formatVerdictDetails(payload);
-
-  banner.append(title, details);
-  appendConversationNode(banner);
-}
-
 function appendConversationNode(node) {
   if (state.scenarioEmptyPlaceholder) {
     state.scenarioEmptyPlaceholder.remove();
@@ -641,24 +599,9 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
-  if (state.currentRoundFilter !== ALL_FILTER) {
-    const roundNum = parseInt(state.currentRoundFilter, 10);
-    const roundMetrics = aggregateRoundMetrics(roundNum);
-    const rv = state.roundVerdicts[roundNum];
-    const evaluated = rv ? rv.pass + rv.fail : 0;
-    const defenseRate = evaluated === 0 ? 0 : Math.round((rv.fail / evaluated) * 100);
-
-    elements.roundMetric.textContent = `${roundNum}`;
-    elements.scenarioMetric.textContent = roundMetrics.scenarios;
-    elements.messageMetric.textContent = roundMetrics.messages;
-    elements.toolCallMetric.textContent = roundMetrics.toolCalls;
-    elements.successRateMetric.textContent = `${defenseRate}%`;
-    return;
-  }
-
-  const metrics = state.scenarioMetrics[ALL_FILTER];
   const defended = state.verdicts - state.successfulVerdicts;
   const defenseRate = state.verdicts === 0 ? 0 : Math.round((defended / state.verdicts) * 100);
+  const metrics = state.scenarioMetrics[ALL_FILTER];
 
   elements.roundMetric.textContent = state.rounds.length;
   elements.scenarioMetric.textContent = state.scenarios;
@@ -667,59 +610,22 @@ function updateMetrics() {
   elements.successRateMetric.textContent = `${defenseRate}%`;
 }
 
-function aggregateRoundMetrics(roundNumber) {
-  let messages = 0;
-  let toolCalls = 0;
-  let scenarios = 0;
-
-  for (const [key, meta] of Object.entries(state.scenarioMetadata)) {
-    if (meta.roundNumber === roundNumber) {
-      scenarios += 1;
-      const m = state.scenarioMetrics[key];
-      if (m) {
-        messages += m.messages;
-        toolCalls += m.toolCalls;
-      }
-    }
-  }
-
-  return { scenarios, messages, toolCalls };
-}
-
 function updateHeaderSummary() {
-  if (state.currentScenario !== ALL_FILTER) {
+  if (state.currentScenario) {
     const meta = state.scenarioMetadata[state.currentScenario];
     if (meta) {
-      const prefix = meta.roundNumber !== null ? `R${meta.roundNumber}: ` : "";
       const name = humanizeName(meta.name);
       if (meta.verdict) {
         const status = meta.verdict.success ? "BREACHED" : "DEFENDED";
-        elements.headerSummary.textContent = `${prefix}${name} \u2014 ${status}`;
+        elements.headerSummary.textContent = `${name} \u2014 ${status}`;
       } else {
-        elements.headerSummary.textContent = `${prefix}${name} \u2014 in progress`;
+        elements.headerSummary.textContent = `${name} \u2014 in progress`;
       }
     }
     return;
   }
 
-  if (state.currentRoundFilter !== ALL_FILTER) {
-    const roundNum = parseInt(state.currentRoundFilter, 10);
-    const rv = state.roundVerdicts[roundNum];
-    if (rv) {
-      const evaluated = rv.pass + rv.fail;
-      if (evaluated > 0) {
-        elements.headerSummary.textContent = `Round ${roundNum} \u2014 ${rv.fail}/${evaluated} defended`;
-      } else {
-        elements.headerSummary.textContent = `Round ${roundNum} \u2014 in progress`;
-      }
-    }
-    return;
-  }
-
-  if (state.verdicts > 0) {
-    const defended = state.verdicts - state.successfulVerdicts;
-    elements.headerSummary.textContent = `${state.rounds.length} rounds, ${defended}/${state.verdicts} defended`;
-  } else if (state.events > 0) {
+  if (state.events > 0) {
     elements.headerSummary.textContent = `${state.events} events`;
   } else {
     elements.headerSummary.textContent = "Waiting for arena events";
@@ -748,28 +654,24 @@ function resetState() {
   state.scenarios = 0;
   state.verdicts = 0;
   state.successfulVerdicts = 0;
-  state.currentScenario = ALL_FILTER;
-  state.currentRoundFilter = ALL_FILTER;
+  state.currentScenario = null;
+  state.currentRoundFilter = null;
   state.currentRoundNumber = null;
   state.activeScenarioKey = null;
   state.rounds = [];
   state.roundVerdicts = {};
   state.scenarioEvents = { [ALL_FILTER]: [] };
   state.scenarioEmptyPlaceholder = null;
-  state.lastRenderedRound = null;
   state.scenarioMetadata = {};
   state.scenarioMetrics = { [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 } };
 
-  elements.roundSelector.querySelectorAll('.round-button:not([data-round="all"])').forEach((button) => button.remove());
-  elements.roundSelector.querySelector('[data-round="all"]').classList.add("active");
-  elements.scenarioTabs.querySelectorAll('.scenario-tab:not([data-scenario="all"])').forEach((tab) => tab.remove());
-  elements.scenarioTabs.querySelector('[data-scenario="all"]').classList.add("active");
+  elements.roundSelector.querySelectorAll(".round-button").forEach((button) => button.remove());
+  elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => tab.remove());
 
   elements.conversation.innerHTML = "";
   elements.emptyState = null;
   elements.headerSummary.textContent = "Waiting for arena events";
-  elements.latestType.textContent = "None";
-  elements.latestTimestamp.textContent = "None";
+  clearVerdictCard();
   elements.roundComparison.innerHTML = "";
   elements.roundComparisonCard.classList.add("hidden");
   setStatus("Idle", "idle");
@@ -811,7 +713,7 @@ function buildScenarioKey(roundNumber, scenarioName) {
 }
 
 function scenarioMatchesRoundFilter(scenarioKey) {
-  if (state.currentRoundFilter === ALL_FILTER) {
+  if (state.currentRoundFilter === null) {
     return true;
   }
 
@@ -820,7 +722,7 @@ function scenarioMatchesRoundFilter(scenarioKey) {
 }
 
 function eventMatchesRoundFilter(roundNumber) {
-  return state.currentRoundFilter === ALL_FILTER || String(roundNumber) === state.currentRoundFilter;
+  return state.currentRoundFilter === null || String(roundNumber) === state.currentRoundFilter;
 }
 
 function formatVerdictDetails(payload) {
@@ -845,6 +747,28 @@ function formatVerdictDetails(payload) {
   return parts.join(" | ");
 }
 
+function updateVerdictCard(payload) {
+  const card = elements.verdictCard;
+  card.className = payload.success ? "verdict-card verdict-card-breached" : "verdict-card verdict-card-defended";
+
+  const title = document.createElement("p");
+  title.className = "verdict-card-title";
+  title.textContent = payload.success ? "Attack succeeded" : "Attack failed";
+
+  const details = document.createElement("p");
+  details.className = "verdict-card-details";
+  details.textContent = formatVerdictDetails(payload);
+
+  card.innerHTML = "";
+  card.append(title, details);
+}
+
+function clearVerdictCard() {
+  elements.verdictCard.className = "mt-4 text-sm text-zinc-500";
+  elements.verdictCard.innerHTML = "";
+  elements.verdictCard.textContent = "No verdict yet";
+}
+
 function isConversationNearBottom() {
   const distanceFromBottom =
     elements.conversation.scrollHeight - elements.conversation.scrollTop - elements.conversation.clientHeight;
@@ -854,16 +778,4 @@ function isConversationNearBottom() {
 function scrollConversationToBottom() {
   elements.conversation.scrollTop = elements.conversation.scrollHeight;
   elements.scrollButton.classList.add("hidden");
-}
-
-function formatCount(count, noun) {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
-function formatTimestamp(timestamp) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(timestamp));
 }
