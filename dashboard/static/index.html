@@ -14,7 +14,15 @@
           <h1 class="text-lg font-semibold tracking-normal text-white">AgentShield Arena</h1>
           <p class="text-sm text-zinc-400">Live conversation demo</p>
         </div>
-        <span id="statusBadge" class="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-300">Idle</span>
+        <div class="flex items-center gap-3">
+          <select
+            id="runSelector"
+            class="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm text-zinc-300 focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="latest">Latest (Live)</option>
+          </select>
+          <span id="statusBadge" class="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-300">Idle</span>
+        </div>
       </div>
     </header>
 

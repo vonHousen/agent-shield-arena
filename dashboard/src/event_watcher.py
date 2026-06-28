@@ -8,7 +8,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from common.src.event_emitter import DEFAULT_EVENTS_PATH
 from common.src.models import ArenaEvent
 
 POLL_INTERVAL_SECONDS = 0.1
@@ -23,7 +22,7 @@ WatcherMessage = ArenaEvent | ResetSignal
 
 
 async def watch_events(
-    path: Path = DEFAULT_EVENTS_PATH,
+    path: Path,
     poll_interval_seconds: float = POLL_INTERVAL_SECONDS,
 ) -> AsyncGenerator[WatcherMessage]:
     """Replay existing events and yield newly appended events.

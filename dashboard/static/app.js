@@ -1,3 +1,5 @@
+const RUNS_POLL_INTERVAL_MS = 5000;
+
 const state = {
   events: 0,
   currentScenario: "all",
@@ -8,6 +10,9 @@ const state = {
   scenarioMetrics: {
     all: { messages: 0, toolCalls: 0, toolResults: 0 },
   },
+
+  selectedRun: "latest",
+  socket: null,
 };
 
 const elements = {
@@ -22,6 +27,7 @@ const elements = {
   toolCallMetric: document.querySelector("#toolCallMetric"),
   latestType: document.querySelector("#latestType"),
   latestTimestamp: document.querySelector("#latestTimestamp"),
+  runSelector: document.querySelector("#runSelector"),
 };
 
 elements.scrollButton.addEventListener("click", () => {
@@ -35,11 +41,25 @@ elements.scenarioTabs.addEventListener("click", (e) => {
   }
 });
 
+elements.runSelector.addEventListener("change", () => {
+  state.selectedRun = elements.runSelector.value;
+  connectWebSocket();
+});
+
+fetchRuns();
 connectWebSocket();
+setInterval(fetchRuns, RUNS_POLL_INTERVAL_MS);
 
 function connectWebSocket() {
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
+  const runParam = encodeURIComponent(state.selectedRun);
+  const socket = new WebSocket(`${protocol}://${window.location.host}/ws?run=${runParam}`);
+  state.socket = socket;
 
   socket.addEventListener("open", () => {
     resetState();
@@ -56,13 +76,57 @@ function connectWebSocket() {
   });
 
   socket.addEventListener("close", () => {
-    setStatus("Idle", "idle");
-    window.setTimeout(connectWebSocket, 1500);
+    if (state.socket === socket) {
+      setStatus("Idle", "idle");
+      window.setTimeout(connectWebSocket, 1500);
+    }
   });
 
   socket.addEventListener("error", () => {
     socket.close();
   });
+}
+
+async function fetchRuns() {
+  try {
+    const response = await fetch("/api/runs");
+    const runs = await response.json();
+    populateRunSelector(runs);
+  } catch {
+    /* network hiccup — retry on next interval */
+  }
+}
+
+function populateRunSelector(runs) {
+  const previous = state.selectedRun;
+
+  while (elements.runSelector.options.length > 1) {
+    elements.runSelector.remove(1);
+  }
+
+  for (const run of runs) {
+    const option = document.createElement("option");
+    option.value = run.id;
+    option.textContent = formatRunLabel(run.timestamp);
+    elements.runSelector.append(option);
+  }
+
+  elements.runSelector.value = previous;
+  if (elements.runSelector.selectedIndex === -1) {
+    elements.runSelector.value = "latest";
+    state.selectedRun = "latest";
+  }
+}
+
+function formatRunLabel(isoTimestamp) {
+  const date = new Date(isoTimestamp);
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
 
 function renderEvent(event) {

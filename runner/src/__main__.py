@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from common.src.config import settings
-from common.src.event_emitter import DEFAULT_EVENTS_PATH, EventEmitter
+from common.src.event_emitter import DEFAULT_EVENTS_DIR, EventEmitter, create_run_dir
 from common.src.logging import DEFAULT_LOG_FILE, setup_logging
 from runner.src.adapter import RealShieldedSystemAdapter
 from runner.src.mock_system import MockShieldedSystem
@@ -20,8 +20,8 @@ MODE_SCENARIO = "scenario"
 
 
 def main(
-    events_path: Path = typer.Option(
-        DEFAULT_EVENTS_PATH, help=f"JSONL event output path. Defaults to {DEFAULT_EVENTS_PATH}."
+    events_dir: Path = typer.Option(
+        DEFAULT_EVENTS_DIR, help=f"Parent directory for timestamped run output. Defaults to {DEFAULT_EVENTS_DIR}."
     ),
     delay: float = typer.Option(settings.runner_turn_delay_seconds, help="Seconds to wait between attack turns."),
     mock: bool = typer.Option(False, help="Use the mock shielded system instead of the real LLM-backed one."),
@@ -33,7 +33,7 @@ def main(
     """Run attack scenarios against the shielded system.
 
     Args:
-        events_path: JSONL event output path.
+        events_dir: Parent directory for timestamped run output.
         delay: Seconds to wait between attack turns.
         mock: Use the mock shielded system instead of the real LLM-backed one.
         mode: Attack mode, either canned scenarios or LLM-generated attacks.
@@ -44,8 +44,7 @@ def main(
     setup_logging(verbose=verbose, log_file=log_file)
     _validate_mode(mode)
 
-    if events_path.exists():
-        events_path.unlink()
+    events_path = create_run_dir(events_dir)
     reset_customer_db()
     event_emitter = EventEmitter(events_path)
     system = MockShieldedSystem() if mock else RealShieldedSystemAdapter()

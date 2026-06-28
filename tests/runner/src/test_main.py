@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from attack_agent.src.strategies import AttackStrategy
+from common.src.event_emitter import EVENTS_FILENAME
 from runner.src import __main__ as runner_main
 from shielded_system.src.models import ChatMessage
 
@@ -39,11 +40,17 @@ class FakeAttackAgent:
         return f"attack from {name}"
 
 
+def _read_events(events_dir: Path) -> list[dict]:
+    """Read all events from the latest run directory."""
+    events_path = events_dir / "latest" / EVENTS_FILENAME
+    return [json.loads(line) for line in events_path.read_text().splitlines()]
+
+
 class TestMain:
     def test_when_mode_omitted_expect_llm_mode_runs_all_strategies(self, tmp_path: Path) -> None:
         """Verify LLM mode is the default and runs one scenario per strategy."""
         # arrange
-        events_path = tmp_path / "events.jsonl"
+        events_dir = tmp_path / "events"
 
         # act
         with (
@@ -51,7 +58,7 @@ class TestMain:
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
         ):
             runner_main.main(
-                events_path=events_path,
+                events_dir=events_dir,
                 delay=0,
                 mock=True,
                 verbose=False,
@@ -60,7 +67,7 @@ class TestMain:
             )
 
         # assert
-        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        events = _read_events(events_dir)
         assert events[0]["event_type"] == "run_started"
         assert events[0]["payload"]["scenario_count"] == len(TWO_TEST_STRATEGIES)
         scenario_names = [e["payload"]["scenario_name"] for e in events if e["event_type"] == "scenario_started"]
@@ -70,7 +77,7 @@ class TestMain:
     def test_when_mode_llm_expect_per_strategy_scenarios_with_generated_messages(self, tmp_path: Path) -> None:
         """Verify LLM mode wires one AttackAgent per strategy into separate conversations."""
         # arrange
-        events_path = tmp_path / "events.jsonl"
+        events_dir = tmp_path / "events"
 
         # act
         with (
@@ -78,7 +85,7 @@ class TestMain:
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
         ):
             runner_main.main(
-                events_path=events_path,
+                events_dir=events_dir,
                 delay=0,
                 mock=True,
                 mode="llm",
@@ -88,7 +95,7 @@ class TestMain:
             )
 
         # assert
-        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        events = _read_events(events_dir)
         attacker_messages = [
             e["payload"]["content"]
             for e in events
@@ -104,7 +111,7 @@ class TestMain:
         # act/assert
         try:
             runner_main.main(
-                events_path=tmp_path / "events.jsonl",
+                events_dir=tmp_path / "events",
                 delay=0,
                 mock=True,
                 mode=invalid_mode,

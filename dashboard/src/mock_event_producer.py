@@ -5,13 +5,13 @@ from pathlib import Path
 
 import typer
 
-from common.src.event_emitter import DEFAULT_EVENTS_PATH, EventEmitter
+from common.src.event_emitter import DEFAULT_EVENTS_DIR, EventEmitter, create_run_dir
 from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ScenarioStarted, ToolCall, ToolResult
 
 DEFAULT_DELAY_SECONDS = 0.8
 
 
-async def produce_mock_events(path: Path = DEFAULT_EVENTS_PATH, delay_seconds: float = DEFAULT_DELAY_SECONDS) -> None:
+async def produce_mock_events(path: Path, delay_seconds: float = DEFAULT_DELAY_SECONDS) -> None:
     """Append a short fake attack conversation to the event file.
 
     Args:
@@ -26,10 +26,11 @@ async def produce_mock_events(path: Path = DEFAULT_EVENTS_PATH, delay_seconds: f
 
 
 def main(
-    events_file: Path = typer.Option(DEFAULT_EVENTS_PATH, help="JSONL file to write events into."),
+    events_dir: Path = typer.Option(DEFAULT_EVENTS_DIR, help="Parent directory for timestamped run output."),
     delay: float = typer.Option(DEFAULT_DELAY_SECONDS, help="Delay between emitted events."),
 ) -> None:
     """Write fake dashboard events to a JSONL file."""
+    events_file = create_run_dir(events_dir)
     asyncio.run(produce_mock_events(path=events_file, delay_seconds=delay))
 
 
