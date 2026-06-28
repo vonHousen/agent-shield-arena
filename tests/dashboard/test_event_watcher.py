@@ -69,7 +69,7 @@ class TestWatchEvents:
         watcher = watch_events(event_path, poll_interval_seconds=POLL_INTERVAL_SECONDS)
 
         # act
-        next_event_task = asyncio.create_task(anext(watcher))
+        next_event_task = asyncio.ensure_future(anext(watcher))
         await asyncio.sleep(POLL_INTERVAL_SECONDS * 2)
         EventEmitter(event_path).emit(expected_event)
         actual_event = await asyncio.wait_for(next_event_task, timeout=TIMEOUT_SECONDS)

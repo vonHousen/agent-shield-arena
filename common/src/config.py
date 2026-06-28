@@ -17,4 +17,4 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-settings = Settings()
+settings = Settings()  # ty: ignore[missing-argument]  # pydantic-settings loads values from env

@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -16,7 +16,7 @@ POLL_INTERVAL_SECONDS = 0.1
 async def watch_events(
     path: Path = DEFAULT_EVENTS_PATH,
     poll_interval_seconds: float = POLL_INTERVAL_SECONDS,
-) -> AsyncIterator[ArenaEvent]:
+) -> AsyncGenerator[ArenaEvent]:
     """Replay existing events and yield newly appended events.
 
     Args:
@@ -50,7 +50,7 @@ class WatchedEvent:
         self.file_position = file_position
 
 
-async def _read_events_from_position(path: Path, position: int) -> AsyncIterator[WatchedEvent]:
+async def _read_events_from_position(path: Path, position: int) -> AsyncGenerator[WatchedEvent]:
     with path.open() as file:
         file.seek(0, 2)
         file_size = file.tell()
