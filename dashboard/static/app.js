@@ -5,6 +5,7 @@ const state = {
   currentScenario: "all",
   activeScenarioName: null,
   scenarioEvents: { all: [] },
+  scenarioEmptyPlaceholder: null,
 
   scenarios: 0,
   scenarioMetrics: {
@@ -229,6 +230,7 @@ function switchTab(scenarioName) {
 
 function rerenderConversation() {
   elements.conversation.innerHTML = "";
+  state.scenarioEmptyPlaceholder = null;
 
   const events = state.scenarioEvents[state.currentScenario] || [];
 
@@ -237,6 +239,7 @@ function rerenderConversation() {
     empty.className = "flex h-full items-center justify-center text-sm text-zinc-500";
     empty.textContent = "No events for this scenario";
     elements.conversation.append(empty);
+    state.scenarioEmptyPlaceholder = empty;
     return;
   }
 
@@ -317,6 +320,11 @@ function appendToolResult(payload) {
 }
 
 function appendConversationNode(node) {
+  if (state.scenarioEmptyPlaceholder) {
+    state.scenarioEmptyPlaceholder.remove();
+    state.scenarioEmptyPlaceholder = null;
+  }
+
   const shouldScroll = isConversationNearBottom();
   elements.conversation.append(node);
 
@@ -357,6 +365,7 @@ function resetState() {
   state.currentScenario = "all";
   state.activeScenarioName = null;
   state.scenarioEvents = { all: [] };
+  state.scenarioEmptyPlaceholder = null;
   state.scenarioMetrics = { all: { messages: 0, toolCalls: 0, toolResults: 0 } };
 
   elements.scenarioTabs.querySelectorAll('.scenario-tab:not([data-scenario="all"])').forEach((tab) => tab.remove());
