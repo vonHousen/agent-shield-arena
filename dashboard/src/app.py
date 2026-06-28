@@ -9,12 +9,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from common.src.event_emitter import DEFAULT_EVENTS_PATH
-from dashboard.src.event_watcher import watch_events
+from dashboard.src.event_watcher import ResetSignal, watch_events
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 INDEX_FILE = STATIC_DIR / "index.html"
+RESET_MESSAGE = '{"type": "reset"}'
 
 
 def create_app(events_file: Path = DEFAULT_EVENTS_PATH) -> FastAPI:
@@ -39,8 +40,11 @@ def create_app(events_file: Path = DEFAULT_EVENTS_PATH) -> FastAPI:
         await websocket.accept()
 
         try:
-            async for event in watch_events(app.state.events_file):
-                await websocket.send_text(event.model_dump_json())
+            async for message in watch_events(app.state.events_file):
+                if isinstance(message, ResetSignal):
+                    await websocket.send_text(RESET_MESSAGE)
+                else:
+                    await websocket.send_text(message.model_dump_json())
         except WebSocketDisconnect:
             return
 

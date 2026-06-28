@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common.src.event_emitter import EventEmitter
 from common.src.models import ArenaEvent, ConversationTurn, EventType, Role
-from dashboard.src.event_watcher import watch_events
+from dashboard.src.event_watcher import ResetSignal, watch_events
 
 POLL_INTERVAL_SECONDS = 0.01
 TIMEOUT_SECONDS = 1
@@ -31,7 +31,7 @@ class TestWatchEvents:
         # assert
         assert actual_event == expected_event
 
-    async def test_when_file_is_truncated_expect_replay_from_beginning(self, tmp_path: Path) -> None:
+    async def test_when_file_is_truncated_expect_reset_then_replay(self, tmp_path: Path) -> None:
         # arrange
         event_path = tmp_path / "events.jsonl"
         old_event = ArenaEvent(
@@ -53,10 +53,12 @@ class TestWatchEvents:
         emitter = EventEmitter(event_path)
         emitter.emit(new_event)
 
+        reset_signal = await asyncio.wait_for(anext(watcher), timeout=TIMEOUT_SECONDS)
         actual_event = await asyncio.wait_for(anext(watcher), timeout=TIMEOUT_SECONDS)
         await watcher.aclose()
 
         # assert
+        assert isinstance(reset_signal, ResetSignal)
         assert actual_event == new_event
 
     async def test_when_file_is_created_later_expect_new_event(self, tmp_path: Path) -> None:

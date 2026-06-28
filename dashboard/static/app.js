@@ -48,6 +48,10 @@ function connectWebSocket() {
 
   socket.addEventListener("message", (message) => {
     const event = JSON.parse(message.data);
+    if (event.type === "reset") {
+      resetState();
+      return;
+    }
     renderEvent(event);
   });
 
