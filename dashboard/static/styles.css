@@ -579,3 +579,25 @@ aside {
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+
+/* Triage badges for defender adaptation card */
+.triage-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.triage-badge-memory {
+  border: 1px solid rgb(34 197 94 / 0.55);
+  background: rgb(34 197 94 / 0.16);
+  color: #86efac;
+}
+
+.triage-badge-code {
+  border: 1px solid rgb(245 158 11 / 0.55);
+  background: rgb(245 158 11 / 0.16);
+  color: #fcd34d;
+}

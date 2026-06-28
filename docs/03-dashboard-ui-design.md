@@ -69,12 +69,16 @@ Five stacked cards:
 - Each entry shows: pattern name, summary, affected checkpoint, source attack ID
 - Newly added entries are highlighted with a brief animation
 
-**Card 4: Triage Decisions**
+**Card 4: Defender Adaptation** (mirrors Attack Adaptation card)
 
-- List of triage outcomes for successful attacks
-- Each entry shows: attack ID, fix type (`Defender memory update` or `Code remediation`), brief description
-- Memory updates marked with auto-apply badge
-- Code remediation items marked with human-review-required badge
+Shows the defender's learning journey across rounds:
+
+- Per strategy, defender reflections across rounds with "adapted" arrows
+- Each entry shows: BLOCKED/BREACHED badge, defensive approach, why outcome
+- If breached: shows vulnerability identified and improvement suggestion
+- If Round 2+: shows that memory was loaded (entry count from defender briefing)
+- Triage decisions rendered with badges: green "MEMORY UPDATE" or amber "CODE CHANGE"
+- Filters by current round and scenario selection
 
 **Card 5: Round Comparison** (appears after round 1 completes)
 
@@ -99,20 +103,23 @@ class ArenaEvent(BaseModel):
 
 | Type | Payload Fields | Trigger |
 |---|---|---|
-| `experiment_started` | experiment_id, config, total_rounds | Experiment begins |
-| `round_started` | round_number, total_attacks | Each round begins |
-| `attack_started` | attack_id, strategy, target_rule | Each attack begins |
-| `message` | attack_id, role, content | Each conversation message |
-| `defender_decision` | attack_id, checkpoint, decision, reasoning | Defender ALLOW/BLOCK |
+| `run_started` | scenario_count | Arena begins |
+| `run_completed` | — | Arena ends |
+| `round_started` | round_number, strategy_count | Each round begins |
+| `scenario_started` | scenario_name | Each scenario begins |
+| `conversation_turn` | role, content | Each conversation message |
+| `defender_decision` | checkpoint, decision, reason, confidence, tool_name, tool_arguments | Defender ALLOW/BLOCK |
 | `defender_tip` | tip_text | Security advisory injected into assistant context (tip mode) |
-| `tool_call` | attack_id, tool_name, arguments | Shielded System invokes a tool |
-| `tool_result` | attack_id, tool_name, result | Tool returns result |
-| `attack_completed` | attack_id, final_response | Conversation ends |
-| `evaluation_completed` | attack_id, success, violation_type, severity | Evaluator verdict |
-| `triage_completed` | attack_id, fix_type, memory_entry | Triage classification |
-| `memory_updated` | entry_id, pattern_name, summary | Defender memory entry added |
-| `round_completed` | round_number, metrics | Round ends with aggregated stats |
-| `experiment_completed` | final_metrics, total_memory_entries | Experiment ends |
+| `defender_briefing` | round_number, memory_context, entry_count | Defender loads memory (Round 2+) |
+| `defender_reflection` | strategy_name, round_number, attack_blocked, defensive_approach, why_outcome, vulnerability_identified, improvement_suggestion | After each scenario (defender perspective) |
+| `tool_call` | tool_name, arguments | Shielded System invokes a tool |
+| `tool_result` | tool_name, result | Tool returns result |
+| `evaluation_verdict` | trace_id, success, violation_type, violated_rule, evidence, severity | Evaluator verdict |
+| `attack_reflection` | strategy_name, round_number, success, tactic_used, why_outcome, defensive_trigger, suggested_mutations | After each conversation |
+| `attack_briefing` | strategy_name, round_number, memory_context | Before Round 2+ conversations |
+| `attacker_reasoning` | strategy_name, turn_number, reasoning | Each attacker turn |
+| `triage_decision` | remediation_path, pattern_description, affected_component, rationale | Successful attack triaged |
+| `content_filter` | source, message | Provider content policy hit |
 
 ### 4.3 EventEmitter
 
@@ -191,20 +198,23 @@ If the event file does not exist when the dashboard starts (no experiment has ru
 
 | Event Type | UI Action |
 |---|---|
-| `experiment_started` | Set top bar experiment name, status to "Running", start timer |
-| `round_started` | Update progress card, clear conversation panel |
-| `attack_started` | Add attack to sidebar list, select it, clear conversation area |
-| `message` | Append styled message bubble to conversation |
+| `run_started` | Set top bar status to "Running" |
+| `run_completed` | Set top bar status to "Completed" |
+| `round_started` | Update progress card, add round button |
+| `scenario_started` | Add scenario tab, select it |
+| `conversation_turn` | Append styled message bubble to conversation |
 | `defender_decision` | Append decision badge to conversation |
 | `defender_tip` | Append amber system-note card showing the injected advisory |
+| `defender_briefing` | Store briefing, re-render Defender Adaptation card |
+| `defender_reflection` | Store reflection, re-render Defender Adaptation card |
 | `tool_call` | Append collapsible tool-call card |
 | `tool_result` | Update the tool-call card with result |
-| `attack_completed` | Update attack sidebar status |
-| `evaluation_completed` | Update attack sidebar badge (SUCCEEDED/BLOCKED), update metrics |
-| `triage_completed` | Add entry to triage card |
-| `memory_updated` | Add entry to defender memory card with highlight animation |
-| `round_completed` | Update metrics card, update round comparison chart |
-| `experiment_completed` | Set top bar status to "Completed", stop timer, show final metrics |
+| `attacker_reasoning` | Append reasoning bubble to conversation |
+| `evaluation_verdict` | Update scenario tab badge (BREACHED/DEFENDED), update metrics |
+| `attack_briefing` | Store briefing, re-render Attack Adaptation card |
+| `attack_reflection` | Store reflection, re-render Attack Adaptation card |
+| `triage_decision` | Store decision, re-render Defender Adaptation card |
+| `content_filter` | Append content-filter banner to conversation |
 
 ### 6.2 Auto-scroll
 

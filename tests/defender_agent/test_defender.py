@@ -73,7 +73,6 @@ class TestDefenderOnUserInput:
         assert decision.decision == "ALLOW"
         assert decision.reason == "Routine refund request within policy."
         assert decision.confidence == 0.82
-        assert decision.matched_patterns == []
         assert llm_client.response_formats == [InputCheckpointDecision]
         assert business_rules in llm_client.requests[0][1]["content"]
         assert "I'd like a refund of $50 on my order." in llm_client.requests[0][1]["content"]
@@ -137,7 +136,6 @@ class TestDefenderOnToolCall:
         # assert
         assert decision.checkpoint == "on_tool_call"
         assert decision.decision == "BLOCK"
-        assert decision.matched_patterns == ["def-entry-001"]
         assert llm_client.response_formats == [ToolCallCheckpointDecision]
         assert "process_refund" in llm_client.requests[0][1]["content"]
         assert '"amount": 90' in llm_client.requests[0][1]["content"]
@@ -167,7 +165,6 @@ class TestDefenderOnToolCall:
         assert decision.checkpoint == "on_tool_call"
         assert decision.decision == "ALLOW"
         assert decision.reason == "Customer lookup is needed to answer support request."
-        assert decision.matched_patterns == []
 
 
 def _completion(content: str) -> dict[str, Any]:

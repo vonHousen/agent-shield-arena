@@ -212,7 +212,6 @@ class TestDefendedSystemToolDecisions:
                     checkpoint="on_tool_call",
                     decision="BLOCK",
                     reason="Known split-refund pattern.",
-                    matched_patterns=["def-pattern-1"],
                 )
             ],
         )

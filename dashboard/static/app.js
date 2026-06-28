@@ -25,6 +25,10 @@ const state = {
   reflections: [],
   briefings: {},
 
+  defenderReflections: [],
+  defenderBriefings: {},
+  triageDecisions: [],
+
   selectedRun: "latest",
   socket: null,
 };
@@ -46,6 +50,8 @@ const elements = {
   roundComparison: document.querySelector("#roundComparison"),
   adaptationCard: document.querySelector("#adaptationCard"),
   adaptationContent: document.querySelector("#adaptationContent"),
+  defenderAdaptationCard: document.querySelector("#defenderAdaptationCard"),
+  defenderAdaptationContent: document.querySelector("#defenderAdaptationContent"),
 };
 
 elements.scrollButton.addEventListener("click", () => {
@@ -191,6 +197,21 @@ function renderEvent(event) {
 
   if (event.event_type === "attack_reflection") {
     handleAttackReflection(event.payload);
+    return;
+  }
+
+  if (event.event_type === "defender_briefing") {
+    handleDefenderBriefing(event.payload);
+    return;
+  }
+
+  if (event.event_type === "defender_reflection") {
+    handleDefenderReflection(event.payload);
+    return;
+  }
+
+  if (event.event_type === "triage_decision") {
+    handleTriageDecision(event.payload);
     return;
   }
 
@@ -462,6 +483,7 @@ function switchRound(roundFilter) {
   rerenderConversation();
   updateVerdictForCurrentScenario();
   renderAdaptationCard();
+  renderDefenderAdaptationCard();
   updateMetrics();
   updateHeaderSummary();
 }
@@ -472,6 +494,7 @@ function switchTab(scenarioKey) {
   rerenderConversation();
   updateVerdictForCurrentScenario();
   renderAdaptationCard();
+  renderDefenderAdaptationCard();
   updateMetrics();
   updateHeaderSummary();
 }
@@ -664,11 +687,6 @@ function appendDefenderDecision(payload) {
     details.append(argsEl);
   }
 
-  const matchedPatterns = payload.matched_patterns || [];
-  if (matchedPatterns.length > 0) {
-    details.append(createDefenderDetail("Matched", matchedPatterns.join(", ")));
-  }
-
   if (payload.confidence !== null && payload.confidence !== undefined) {
     const confidence = `${Math.round(payload.confidence * 100)}%`;
     details.append(createDefenderDetail("Confidence", confidence));
@@ -795,6 +813,10 @@ function resetState() {
   state.reflections = [];
   state.briefings = {};
 
+  state.defenderReflections = [];
+  state.defenderBriefings = {};
+  state.triageDecisions = [];
+
   elements.roundSelector.querySelectorAll(".round-button").forEach((button) => button.remove());
   elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => tab.remove());
 
@@ -806,6 +828,8 @@ function resetState() {
   elements.roundComparisonCard.classList.add("hidden");
   elements.adaptationContent.innerHTML = "";
   elements.adaptationCard.classList.add("hidden");
+  elements.defenderAdaptationContent.innerHTML = "";
+  elements.defenderAdaptationCard.classList.add("hidden");
   setStatus("Idle", "idle");
   updateMetrics();
 }
@@ -1018,6 +1042,21 @@ function handleAttackReflection(payload) {
   renderAdaptationCard();
 }
 
+function handleDefenderBriefing(payload) {
+  state.defenderBriefings[payload.round_number] = payload;
+  renderDefenderAdaptationCard();
+}
+
+function handleDefenderReflection(payload) {
+  state.defenderReflections.push(payload);
+  renderDefenderAdaptationCard();
+}
+
+function handleTriageDecision(payload) {
+  state.triageDecisions.push(payload);
+  renderDefenderAdaptationCard();
+}
+
 function renderAdaptationCard() {
   const container = elements.adaptationContent;
   container.innerHTML = "";
@@ -1109,6 +1148,131 @@ function renderAdaptationCard() {
           row.append(label, value);
           entry.appendChild(row);
         }
+      }
+
+      section.append(entry);
+    }
+
+    container.append(section);
+  }
+}
+
+function renderDefenderAdaptationCard() {
+  const container = elements.defenderAdaptationContent;
+  container.innerHTML = "";
+
+  if (state.defenderReflections.length === 0 && state.triageDecisions.length === 0) {
+    elements.defenderAdaptationCard.classList.add("hidden");
+    return;
+  }
+
+  let visibleReflections = state.defenderReflections;
+  if (state.currentScenario) {
+    const meta = state.scenarioMetadata[state.currentScenario];
+    if (meta) {
+      visibleReflections = state.defenderReflections.filter((r) => r.strategy_name === meta.name);
+    }
+  }
+  if (state.currentRoundFilter !== null) {
+    const maxRound = parseInt(state.currentRoundFilter, 10);
+    visibleReflections = visibleReflections.filter((r) => r.round_number <= maxRound);
+  }
+
+  let visibleTriage = state.triageDecisions;
+  if (state.currentRoundFilter !== null) {
+    const maxRound = parseInt(state.currentRoundFilter, 10);
+    visibleTriage = visibleTriage.filter((t) => !t.round_number || t.round_number <= maxRound);
+  }
+
+  if (visibleReflections.length === 0 && visibleTriage.length === 0) {
+    elements.defenderAdaptationCard.classList.add("hidden");
+    return;
+  }
+
+  elements.defenderAdaptationCard.classList.remove("hidden");
+
+  if (visibleTriage.length > 0) {
+    const triageSection = document.createElement("div");
+    triageSection.className = "adaptation-strategy";
+
+    const triageTitle = document.createElement("p");
+    triageTitle.className = "adaptation-strategy-title";
+    triageTitle.textContent = "Learned Patterns";
+    triageSection.append(triageTitle);
+
+    for (const triage of visibleTriage) {
+      const entry = document.createElement("div");
+      entry.className = "adaptation-entry adaptation-entry-defended";
+
+      const header = document.createElement("p");
+      header.className = "adaptation-entry-header";
+      const badgeClass = triage.remediation_path === "defender_memory" ? "triage-badge-memory" : "triage-badge-code";
+      const badgeText = triage.remediation_path === "defender_memory" ? "MEMORY UPDATE" : "CODE CHANGE";
+      header.innerHTML = `<span class="triage-badge ${badgeClass}">${badgeText}</span>`;
+      entry.append(header);
+
+      entry.appendChild(createVerdictField("Pattern", triage.pattern_description));
+      if (triage.affected_component) {
+        entry.appendChild(createVerdictField("Component", triage.affected_component));
+      }
+
+      triageSection.append(entry);
+    }
+
+    container.append(triageSection);
+  }
+
+  const strategies = [...new Set(visibleReflections.map((r) => r.strategy_name))];
+
+  for (const strategyName of strategies) {
+    const strategyReflections = visibleReflections
+      .filter((r) => r.strategy_name === strategyName)
+      .sort((a, b) => a.round_number - b.round_number);
+
+    const section = document.createElement("div");
+    section.className = "adaptation-strategy";
+
+    const title = document.createElement("p");
+    title.className = "adaptation-strategy-title";
+    title.textContent = humanizeName(strategyName);
+    section.append(title);
+
+    for (let i = 0; i < strategyReflections.length; i++) {
+      const reflection = strategyReflections[i];
+
+      if (i > 0) {
+        const arrow = document.createElement("div");
+        arrow.className = "adaptation-arrow";
+        arrow.textContent = "adapted";
+        section.append(arrow);
+      }
+
+      const entry = document.createElement("div");
+      entry.className = reflection.attack_blocked
+        ? "adaptation-entry adaptation-entry-defended"
+        : "adaptation-entry adaptation-entry-breached";
+
+      const header = document.createElement("p");
+      header.className = "adaptation-entry-header";
+      header.textContent = `R${reflection.round_number} ${reflection.attack_blocked ? "BLOCKED" : "BREACHED"}`;
+      entry.append(header);
+
+      entry.appendChild(createVerdictField("Approach", reflection.defensive_approach));
+      entry.appendChild(createVerdictField("Why", reflection.why_outcome));
+
+      if (!reflection.attack_blocked && reflection.vulnerability_identified) {
+        entry.appendChild(createVerdictField("Vulnerability", reflection.vulnerability_identified));
+      }
+
+      if (reflection.improvement_suggestion) {
+        entry.appendChild(createVerdictField("Improve", reflection.improvement_suggestion));
+      }
+
+      const briefing = state.defenderBriefings[reflection.round_number];
+      if (briefing) {
+        entry.appendChild(
+          createVerdictField("Memory loaded", `${briefing.entry_count} pattern(s)`)
+        );
       }
 
       section.append(entry);

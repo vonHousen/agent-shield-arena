@@ -30,7 +30,6 @@ class InputCheckpointDecision(BaseModel):
         decision: Whether the message should be blocked or allowed.
         reason: Concise explanation of the decision.
         confidence: Confidence score between 0.0 and 1.0.
-        matched_pattern_ids: Defender memory pattern IDs that influenced the decision.
     """
 
     decision: Literal["BLOCK", "ALLOW"] = Field(
@@ -38,10 +37,6 @@ class InputCheckpointDecision(BaseModel):
     )
     reason: str = Field(description="Concise explanation grounded in the message, rules, or matched memory.")
     confidence: float = Field(description="Confidence score from 0.0 to 1.0.")
-    matched_pattern_ids: list[str] = Field(
-        default_factory=list,
-        description="IDs of known defender memory patterns that matched this input. Empty when none matched.",
-    )
 
 
 class ToolCallCheckpointDecision(BaseModel):
@@ -51,7 +46,6 @@ class ToolCallCheckpointDecision(BaseModel):
         decision: Whether the tool call should be blocked or allowed.
         reason: Concise explanation of the decision.
         confidence: Confidence score between 0.0 and 1.0.
-        matched_pattern_ids: Defender memory pattern IDs that influenced the decision.
     """
 
     decision: Literal["BLOCK", "ALLOW"] = Field(
@@ -62,10 +56,6 @@ class ToolCallCheckpointDecision(BaseModel):
     )
     reason: str = Field(description="Concise explanation grounded in the tool call, rules, or matched memory.")
     confidence: float = Field(description="Confidence score from 0.0 to 1.0.")
-    matched_pattern_ids: list[str] = Field(
-        default_factory=list,
-        description="IDs of known defender memory patterns that matched this tool call. Empty when none matched.",
-    )
 
 
 class LLMClient(Protocol):
@@ -136,7 +126,6 @@ class Defender:
             checkpoint="on_user_input",
             decision=decision.decision,
             reason=decision.reason,
-            matched_patterns=decision.matched_pattern_ids,
             confidence=decision.confidence,
         )
 
@@ -169,7 +158,6 @@ class Defender:
             checkpoint="on_tool_call",
             decision=decision.decision,
             reason=decision.reason,
-            matched_patterns=decision.matched_pattern_ids,
             confidence=decision.confidence,
             tool_name=tool_name,
             tool_arguments=arguments,

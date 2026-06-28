@@ -20,6 +20,8 @@ from common.src.models import (
     AttackReflection,
     ContentFilterEvent,
     ConversationTurn,
+    DefenderBriefing,
+    DefenderReflection,
     EvaluationVerdict,
     EventType,
     Role,
@@ -34,6 +36,7 @@ from common.src.models import (
 )
 from defender_agent.src.defended_system import DefendedSystem, Defender
 from defender_agent.src.memory import DefenderMemoryEntry
+from defender_agent.src.reflector import DefenderReflector
 from runner.src.attack_source import AttackSource, LLMAttackSource, MockAttackSource
 from runner.src.models import ArenaResult, RoundResult, ShieldedSystemResponse, StrategyResult
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
@@ -90,6 +93,12 @@ class DefenderMemory(Protocol):
         Args:
             entry: Defender memory entry extracted from triage.
         """
+
+    def load_all(self) -> list[DefenderMemoryEntry]:
+        """Load all defender memory entries from disk."""
+
+    def format_for_prompt(self) -> str:
+        """Return learned defender patterns formatted for prompt injection."""
 
 
 class TriageAgent(Protocol):
@@ -235,6 +244,7 @@ async def run_arena(
     defender_memory: DefenderMemory | None = None,
     triage_agent: TriageAgent | None = None,
     defender_input_mode: str = "tip",
+    defender_reflector: DefenderReflector | None = None,
 ) -> ArenaResult:
     """Run a multi-round arena loop with evaluation and attack memory updates.
 
@@ -254,6 +264,7 @@ async def run_arena(
         defender_memory: Optional Defender memory receiving triaged patterns.
         triage_agent: Optional Triage Agent for successful attacks.
         defender_input_mode: How to handle BLOCK decisions on user input ('block' or 'tip').
+        defender_reflector: Optional DefenderReflector for post-mortem from defender perspective.
     """
     arena_strategies = strategies or SEED_STRATEGIES
     arena_reflector = reflector or TacticalReflector()
@@ -269,6 +280,11 @@ async def run_arena(
     try:
         for round_number in range(1, rounds + 1):
             _emit_round_started(event_emitter, round_number=round_number, strategy_count=len(arena_strategies))
+            if round_number > 1 and defender_memory is not None:
+                entries = defender_memory.load_all()
+                if entries:
+                    memory_context = defender_memory.format_for_prompt()
+                    _emit_defender_briefing(event_emitter, round_number, memory_context, len(entries))
             strategy_results: list[StrategyResult] = []
             memory_round_dir = memory_run_dir / f"round_{round_number}"
 
@@ -323,6 +339,20 @@ async def run_arena(
                 memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict, reflection))
                 _emit_evaluation_verdict(event_emitter, verdict)
                 _emit_attack_reflection(event_emitter, strategy.name, round_number, verdict, reflection)
+                if defender_reflector is not None:
+                    try:
+                        defender_refl = await defender_reflector.reflect(
+                            trace=trace,
+                            verdict=verdict,
+                            strategy_name=strategy.name,
+                            round_number=round_number,
+                        )
+                        _emit_defender_reflection(event_emitter, defender_refl)
+                    except ContentFilterError as e:
+                        logger.warning(f"Content filter hit during defender reflection of '{strategy.name}': {e}")
+                        _emit_content_filter(
+                            event_emitter, source="defender_reflector", scenario_name=strategy.name, error=e
+                        )
                 defender_blocks = defended_system.consume_block_count() if defended_system is not None else 0
                 if verdict.success and triage_agent is not None:
                     try:
@@ -612,6 +642,33 @@ def _emit_attack_reflection(
                 defensive_trigger=reflection.defensive_trigger,
                 suggested_mutations=reflection.suggested_mutations,
             ),
+        )
+    )
+
+
+def _emit_defender_briefing(
+    event_emitter: EventEmitter,
+    round_number: int,
+    memory_context: str,
+    entry_count: int,
+) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.DEFENDER_BRIEFING,
+            payload=DefenderBriefing(
+                round_number=round_number,
+                memory_context=memory_context,
+                entry_count=entry_count,
+            ),
+        )
+    )
+
+
+def _emit_defender_reflection(event_emitter: EventEmitter, reflection: DefenderReflection) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.DEFENDER_REFLECTION,
+            payload=reflection,
         )
     )
 

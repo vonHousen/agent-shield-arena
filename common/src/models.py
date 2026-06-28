@@ -22,6 +22,8 @@ class EventType(StrEnum):
     ATTACKER_REASONING = "attacker_reasoning"
     DEFENDER_DECISION = "defender_decision"
     DEFENDER_TIP = "defender_tip"
+    DEFENDER_BRIEFING = "defender_briefing"
+    DEFENDER_REFLECTION = "defender_reflection"
     TRIAGE_DECISION = "triage_decision"
     CONTENT_FILTER = "content_filter"
 
@@ -207,7 +209,6 @@ class DefenderDecision(BaseModel):
         checkpoint: Which checkpoint produced this decision.
         decision: Whether the input or tool call was blocked or allowed.
         reason: Human-readable explanation of the decision.
-        matched_patterns: Memory pattern IDs that triggered the decision (empty when no memory).
         confidence: Optional LLM confidence score for the decision.
         tool_name: Name of the evaluated tool (only for on_tool_call checkpoint).
         tool_arguments: Arguments of the evaluated tool call (only for on_tool_call checkpoint).
@@ -217,7 +218,6 @@ class DefenderDecision(BaseModel):
     checkpoint: Literal["on_user_input", "on_tool_call"]
     decision: Literal["BLOCK", "ALLOW"]
     reason: str
-    matched_patterns: list[str] = Field(default_factory=list)
     confidence: float | None = None
     tool_name: str | None = None
     tool_arguments: dict[str, Any] | None = None
@@ -231,6 +231,42 @@ class DefenderTip(BaseModel):
     """
 
     tip_text: str
+
+
+class DefenderBriefing(BaseModel):
+    """Memory context loaded into the defender at the start of a round.
+
+    Args:
+        round_number: Which arena round this briefing precedes.
+        memory_context: The formatted memory text injected into the defender's prompt.
+        entry_count: Number of memory entries loaded.
+    """
+
+    round_number: int
+    memory_context: str
+    entry_count: int
+
+
+class DefenderReflection(BaseModel):
+    """Post-mortem analysis from the defender's perspective after each scenario.
+
+    Args:
+        strategy_name: Name of the attack strategy that was evaluated.
+        round_number: Which arena round this reflection is from.
+        attack_blocked: Whether the defender successfully prevented the attack.
+        defensive_approach: What the defender did (actions taken, checkpoints triggered).
+        why_outcome: Why the defense succeeded or failed.
+        vulnerability_identified: If breached, the gap in defensive coverage. None if blocked.
+        improvement_suggestion: What could strengthen the defense for similar attacks.
+    """
+
+    strategy_name: str
+    round_number: int
+    attack_blocked: bool
+    defensive_approach: str
+    why_outcome: str
+    vulnerability_identified: str | None = None
+    improvement_suggestion: str | None = None
 
 
 class TriageDecision(BaseModel):
@@ -294,6 +330,8 @@ class ArenaEvent(BaseModel):
         | AttackerReasoning
         | DefenderDecision
         | DefenderTip
+        | DefenderBriefing
+        | DefenderReflection
         | TriageDecision
         | ContentFilterEvent
     )

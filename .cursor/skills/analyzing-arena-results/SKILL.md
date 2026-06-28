@@ -125,6 +125,8 @@ All payload models are defined in [common/src/models.py](common/src/models.py).
 | `conversation_turn` | Message exchanged | `role`, `content`, `tool_executions` |
 | `tool_call` / `tool_result` | Tool was invoked/returned | `tool_name`, `arguments` / `result` |
 | `defender_decision` | Defender checkpoint fired | `checkpoint`, `decision` (ALLOW/BLOCK), `reason`, `confidence`, `tool_name` |
+| `defender_briefing` | Defender loaded memory at round start | `round_number`, `memory_context`, `entry_count` |
+| `defender_reflection` | Post-mortem from defender perspective | `strategy_name`, `round_number`, `attack_blocked`, `defensive_approach`, `why_outcome`, `vulnerability_identified`, `improvement_suggestion` |
 | `evaluation_verdict` | Evaluator judged a trace | `trace_id`, `success`, `violation_type`, `violated_rule`, `evidence`, `severity` |
 | `attack_reflection` | Post-mortem analysis | `strategy_name`, `round_number`, `success`, `tactic_used`, `why_outcome`, `suggested_mutations` |
 | `attacker_reasoning` | Per-turn chain-of-thought | `strategy_name`, `turn_number`, `reasoning` |
@@ -243,7 +245,32 @@ for t in traces:
     print(f"{t['strategy_name']}: {turns} turns, {tools} tool calls")
 ```
 
-### 9. Cross-Artifact Join (Trace -> Verdict -> Memory)
+### 9. Defender Memory Impact
+
+Track how the defender's memory grows and correlate with improved defense:
+
+```python
+events = load_events()
+
+briefings = [e for e in events if e["event_type"] == "defender_briefing"]
+for b in briefings:
+    p = b["payload"]
+    print(f"Round {p['round_number']}: {p['entry_count']} patterns loaded")
+    print(f"  Context: {p['memory_context'][:200]}...")
+
+reflections = [e for e in events if e["event_type"] == "defender_reflection"]
+for r in reflections:
+    p = r["payload"]
+    status = "BLOCKED" if p["attack_blocked"] else "BREACHED"
+    print(f"[{status}] {p['strategy_name']} R{p['round_number']}")
+    print(f"  Approach: {p['defensive_approach']}")
+    if p.get("vulnerability_identified"):
+        print(f"  Gap: {p['vulnerability_identified']}")
+    if p.get("improvement_suggestion"):
+        print(f"  Improve: {p['improvement_suggestion']}")
+```
+
+### 10. Cross-Artifact Join (Trace -> Verdict -> Memory)
 
 Link a trace to its evaluation verdict and memory entry:
 
@@ -264,7 +291,7 @@ for t in traces:
           f"success={verdict.get('success')} | violated={verdict.get('violated_rule')}")
 ```
 
-### 10. Listing Available Runs
+### 11. Listing Available Runs
 
 ```python
 from pathlib import Path

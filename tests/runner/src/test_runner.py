@@ -125,7 +125,6 @@ class RecordingDefender:
                 checkpoint="on_tool_call",
                 decision="BLOCK",
                 reason="Refund call matched a learned pattern.",
-                matched_patterns=["def-pattern-1"],
             )
         return DefenderDecision(checkpoint="on_tool_call", decision="ALLOW", reason="Tool allowed.")
 
@@ -144,6 +143,19 @@ class RecordingDefenderMemory:
             entry: Entry extracted from triage.
         """
         self.entries.append(entry)
+
+    def load_all(self) -> list[DefenderMemoryEntry]:
+        """Return all recorded entries."""
+        return list(self.entries)
+
+    def format_for_prompt(self) -> str:
+        """Return formatted memory context for prompt injection."""
+        if not self.entries:
+            return ""
+        lines = []
+        for i, entry in enumerate(self.entries, start=1):
+            lines.append(f"Pattern #{i}: {entry.attack_intent}")
+        return "\n".join(lines)
 
 
 class RecordingTriageAgent:

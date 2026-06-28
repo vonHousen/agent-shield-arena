@@ -56,6 +56,15 @@ Each arena run produces three kinds of persistent artifacts:
 | `tool_call` | `tool_name`, `arguments` | Shielded system invokes a tool |
 | `tool_result` | `tool_name`, `result` | Tool returns a result |
 | `evaluation_verdict` | `trace_id`, `success`, `violation_type`, `violated_rule`, `evidence`, `severity` | Evaluator judges a completed trace |
+| `attack_reflection` | `strategy_name`, `round_number`, `success`, `tactic_used`, `why_outcome`, `defensive_trigger`, `suggested_mutations` | After each conversation |
+| `attack_briefing` | `strategy_name`, `round_number`, `memory_context` | Before Round 2+ conversations (memory loaded) |
+| `attacker_reasoning` | `strategy_name`, `turn_number`, `reasoning` | Each attacker turn |
+| `defender_decision` | `checkpoint`, `decision`, `reason`, `confidence`, `tool_name`, `tool_arguments` | Defender checkpoint fires |
+| `defender_tip` | `tip_text` | Security advisory injected (tip mode) |
+| `defender_briefing` | `round_number`, `memory_context`, `entry_count` | Defender loads memory at Round 2+ start |
+| `defender_reflection` | `strategy_name`, `round_number`, `attack_blocked`, `defensive_approach`, `why_outcome`, `vulnerability_identified`, `improvement_suggestion` | After each conversation (defender perspective) |
+| `triage_decision` | `remediation_path`, `pattern_description`, `affected_component`, `rationale` | Successful attack triaged |
+| `content_filter` | `source`, `message` | Provider content policy hit |
 
 **Key property:** Events are write-once and never modified. The file only grows during a run.
 
@@ -92,6 +101,7 @@ data/events/
 data/memory/
   20260628_040614/
     attack_memory.jsonl             ← cumulative attack outcomes
+    defender_memory.jsonl           ← learned defender patterns (when defender enabled)
     round_1/
       traces/
         5b126bad...d5b64077.json    ← one trace per strategy

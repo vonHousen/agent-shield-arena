@@ -12,6 +12,7 @@ from common.src.event_emitter import DEFAULT_EVENTS_DIR, EventEmitter, create_ru
 from common.src.logging import DEFAULT_LOG_FILE, setup_logging
 from defender_agent.src.defender import Defender
 from defender_agent.src.memory import DefenderMemory
+from defender_agent.src.reflector import DefenderReflector
 from evaluator.src.evaluator import Evaluator
 from runner.src.adapter import RealShieldedSystemAdapter
 from runner.src.arena_artifacts import (
@@ -80,10 +81,12 @@ def main(
         defender = None
         defender_memory = None
         triage_agent = None
+        defender_reflector = None
         if _defender_enabled:
             defender_memory = DefenderMemory(memory_run_dir / DEFENDER_MEMORY_FILENAME)
             defender = Defender(business_rules=business_rules, memory=defender_memory)
             triage_agent = TriageAgent()
+            defender_reflector = DefenderReflector()
         asyncio.run(
             run_arena(
                 shielded_system=system,
@@ -98,6 +101,7 @@ def main(
                 defender_memory=defender_memory,
                 triage_agent=triage_agent,
                 defender_input_mode=defender_mode,
+                defender_reflector=defender_reflector,
             )
         )
         return

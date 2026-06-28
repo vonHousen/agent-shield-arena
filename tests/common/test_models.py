@@ -332,7 +332,6 @@ class TestDefenderDecision:
             checkpoint="on_tool_call",
             decision="BLOCK",
             reason="Multiple small refunds detected on same order.",
-            matched_patterns=["pattern-001", "pattern-002"],
             confidence=0.95,
         )
 
@@ -340,7 +339,6 @@ class TestDefenderDecision:
         assert decision.checkpoint == "on_tool_call"
         assert decision.decision == "BLOCK"
         assert decision.reason == "Multiple small refunds detected on same order."
-        assert decision.matched_patterns == ["pattern-001", "pattern-002"]
         assert decision.confidence == 0.95
 
     def test_when_allow_with_no_patterns_expect_defaults(self) -> None:
@@ -352,7 +350,6 @@ class TestDefenderDecision:
         )
 
         # assert
-        assert decision.matched_patterns == []
         assert decision.confidence is None
 
     def test_when_serialized_expect_valid_json_roundtrip(self) -> None:
@@ -362,7 +359,6 @@ class TestDefenderDecision:
             checkpoint="on_tool_call",
             decision="BLOCK",
             reason="Split-refund pattern detected.",
-            matched_patterns=["pattern-split-refund"],
             confidence=0.92,
         )
 
@@ -374,7 +370,6 @@ class TestDefenderDecision:
         assert restored.decision_id == "def-001"
         assert restored.checkpoint == "on_tool_call"
         assert restored.decision == "BLOCK"
-        assert restored.matched_patterns == ["pattern-split-refund"]
         assert restored.confidence == 0.92
 
 
