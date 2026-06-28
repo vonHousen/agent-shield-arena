@@ -1,6 +1,6 @@
 # AgentShield Arena
 
-Adaptive guardrails system for customer-facing AI agents. Hardens a **Defender** through adversarial self-play (the Arena), then deploys it as the runtime guardrails layer.
+**Self-improving** guardrails system for any customer-facing AI agent. An **Attack Agent** probes the **Shielded System** as a black box to discover both universal LLM vulnerabilities and system-specific business-rule violations. A **Defender** learns generalized patterns from every successful attack. Each round produces better attacks *and* better defenses — the system gets stronger over time, not weaker. The adversarial loop runs in development (the **Arena**); the hardened Defender then ships as the Shielded System's runtime guardrails in production — it *is* the guardrails, not a layer on top of them.
 
 ## Documentation
 
