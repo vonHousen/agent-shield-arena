@@ -21,69 +21,70 @@ Single-page app with a two-column layout and a top bar.
 
 ### 3.1 Top Bar
 
-- Experiment name
-- Run status indicator: `Running` / `Completed` / `Idle` (color-coded)
-- Elapsed time (live counter while running)
+- Title ("AgentShield Arena") and subtitle
+- Run selector dropdown: switch between historical arena runs or follow the latest (live) run; the list is polled every 5 seconds via `/api/runs`
+- Run status indicator: `Running` / `Completed` / `Idle` (color-coded badge)
 
 ### 3.2 Left Panel — Live Conversations (60% width)
 
 Displays the currently active or selected attack conversation as a chat-style message stream.
 
+**Navigation:**
+
+- Round selector: horizontal row of round buttons at the top. Each button shows the round number and a summary badge (e.g. "Round 1 (2/4 defended)"). A colored dot indicates status: running (amber), all defended (green), or breached (red).
+- Scenario tabs: horizontal row of tabs below the round selector, filtered to the selected round. Each tab shows the scenario name, a status dot, and a BREACHED/DEFENDED badge once evaluated. Clicking a tab switches the conversation view.
+- A header summary shows the current scenario name and its status.
+
 **Message rendering:**
 
 - Each message is labeled by role: `Attacker`, `Shielded System`, `Defender`
-- Attacker messages: red-tinted background
-- Shielded System messages: blue-tinted background
-- Defender decisions appear as inline colored badges: green for ALLOW, red for BLOCK, with reasoning in a tooltip or expandable section
-- Tool calls and tool results render as collapsible cards within the conversation flow
-
-**Attack list sidebar:**
-
-- Vertical list of all attacks in the current round
-- Each entry shows: attack ID, strategy summary (truncated), status badge (`IN PROGRESS`, `BLOCKED`, `SUCCEEDED`, `ALLOWED`)
-- Clicking an attack shows its conversation in the main area
-- The currently running attack is auto-selected and auto-scrolled
+- Attacker messages: red-tinted background, left-aligned
+- Shielded System messages: blue-tinted background, right-aligned
+- Defender decisions appear as expandable cards: green border for ALLOW, red border for BLOCK, with reasoning shown when expanded. BLOCK decisions are auto-expanded.
+- Defender security tips render as amber system-note cards
+- Tool calls and tool results render as collapsible `<details>` cards within the conversation flow
+- Attacker reasoning renders as a distinct bubble with a "Attacker Reasoning" label
+- Content filter hits render as centered banners with a "CONTENT FILTERED" badge
 
 ### 3.3 Right Panel — System Status (40% width)
 
-Five stacked cards:
+Five stacked cards (scrollable):
 
 **Card 1: Arena Progress**
 
-- Current round / total rounds
-- Current attack number / total attacks in round
-- Progress bar for the current round
-- Overall progress bar for the experiment
+- Three large metrics: Rounds completed, Scenarios run, Defender Blocks count
 
-**Card 2: Metrics**
+**Card 2: Round Comparison** (appears once any round has verdicts)
 
-- Attack success rate (current round)
-- Attack success rate comparison: before vs after learning (when applicable)
-- Total violations detected (by type)
-- False positive count (benign tasks incorrectly blocked)
-- Memory entries created
+- Inline horizontal bar chart comparing defense rates across completed rounds
+- Each row shows: round label, CSS bar fill proportional to defended %, and a "X/Y defended" count
+- Rounds still in progress show a distinct bar color
 
-**Card 3: Defender Memory**
+**Card 3: Evaluation Verdict**
 
-- Scrollable list of memory entries
-- Each entry shows: pattern name, summary, affected checkpoint, source attack ID
-- Newly added entries are highlighted with a brief animation
+- Shows the verdict for the currently selected scenario
+- Displays: success/failure title, violation type, violated rule, evidence, severity badge
+- Color-coded: red border for breached, green border for defended
 
-**Card 4: Defender Adaptation** (mirrors Attack Adaptation card)
+**Card 4: Attack Adaptation**
+
+Shows the attacker's learning journey across rounds:
+
+- Per strategy, attacker reflections across rounds with "adapted" arrows
+- Each entry shows: round number, BREACHED/DEFENDED badge, tactic used, outcome explanation
+- If defended: shows what defensive trigger blocked the attack and suggested mutations for next round
+- Filters by current round and scenario selection
+
+**Card 5: Defender Adaptation**
 
 Shows the defender's learning journey across rounds:
 
+- "Learned Patterns" section: triage decisions rendered with badges — green "MEMORY UPDATE" or amber "CODE CHANGE" — showing pattern description and affected component
 - Per strategy, defender reflections across rounds with "adapted" arrows
-- Each entry shows: BLOCKED/BREACHED badge, defensive approach, why outcome
+- Each entry shows: round number, BLOCKED/BREACHED badge, defensive approach, why outcome
 - If breached: shows vulnerability identified and improvement suggestion
 - If Round 2+: shows that memory was loaded (entry count from defender briefing)
-- Triage decisions rendered with badges: green "MEMORY UPDATE" or amber "CODE CHANGE"
 - Filters by current round and scenario selection
-
-**Card 5: Round Comparison** (appears after round 1 completes)
-
-- Simple bar chart comparing attack success rates across completed rounds
-- Rendered with inline SVG or a lightweight chart library (Chart.js via CDN)
 
 ## 4. Event System
 
@@ -252,15 +253,15 @@ Frontend dependencies (CDN, no install):
 | Library | Purpose |
 |---|---|
 | Tailwind CSS | Utility-first styling |
-| Chart.js | Round comparison bar chart |
 
 ## 9. Scope Boundaries
 
 **In scope:**
 - Observe-only dashboard (no arena control from UI)
 - Live streaming of conversations via WebSocket
-- Full system status display (metrics, memory, triage, progress)
+- System status display (progress counts, round comparison, verdict, adaptation cards)
 - Replay on browser connect
+- Historical run selection via `/api/runs` endpoint
 - Event emitter infrastructure for arena components
 
 **Out of scope:**
