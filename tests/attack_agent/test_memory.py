@@ -1,6 +1,13 @@
 """Tests for attack agent memory models."""
 
-from attack_agent.src.memory import AttackMemoryEntry
+from pathlib import Path
+
+import pytest
+
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
+
+FIRST_ROUND = 1
+SECOND_ROUND = 2
 
 
 class TestAttackMemoryEntry:
@@ -85,3 +92,121 @@ class TestAttackMemoryEntry:
         assert restored.strategy_name == "social-engineering"
         assert restored.success is True
         assert restored.signals == ["agent revealed current address"]
+
+
+class TestAttackMemoryAppend:
+    def test_when_appending_entry_expect_jsonl_file_created(self, tmp_path: Path) -> None:
+        # arrange
+        memory_path = tmp_path / "attack_memory.jsonl"
+        memory = AttackMemory(memory_path=memory_path)
+        entry = AttackMemoryEntry(
+            strategy_name="split-refund",
+            success=True,
+            violated_rule="Refunds above $100 require manager approval",
+            affected_component="process_refund",
+            signals=["processed repeated $90 refunds"],
+            round_number=FIRST_ROUND,
+            trace_id="trace-1",
+        )
+
+        # act
+        memory.append(entry)
+
+        # assert
+        loaded_entries = memory.load_all()
+        assert loaded_entries == [entry]
+        assert memory_path.exists()
+
+
+class TestAttackMemoryLoadAll:
+    def test_when_memory_file_missing_expect_empty_list(self, tmp_path: Path) -> None:
+        # arrange
+        memory = AttackMemory(memory_path=tmp_path / "missing.jsonl")
+
+        # act
+        entries = memory.load_all()
+
+        # assert
+        assert entries == []
+
+    def test_when_jsonl_contains_blank_lines_expect_only_entries_loaded(self, tmp_path: Path) -> None:
+        # arrange
+        memory_path = tmp_path / "attack_memory.jsonl"
+        entry = AttackMemoryEntry(
+            entry_id="entry-1",
+            strategy_name="prompt-extraction",
+            success=False,
+            signals=["agent refused to reveal policies"],
+            round_number=FIRST_ROUND,
+            trace_id="trace-1",
+        )
+        memory_path.write_text(f"\n{entry.model_dump_json()}\n\n", encoding="utf-8")
+        memory = AttackMemory(memory_path=memory_path)
+
+        # act
+        entries = memory.load_all()
+
+        # assert
+        assert entries == [entry]
+
+
+class TestAttackMemoryGetByStrategy:
+    def test_when_entries_exist_expect_only_matching_strategy_returned(self, tmp_path: Path) -> None:
+        # arrange
+        memory = AttackMemory(memory_path=tmp_path / "attack_memory.jsonl")
+        split_refund = AttackMemoryEntry(
+            strategy_name="split-refund",
+            success=True,
+            round_number=FIRST_ROUND,
+            trace_id="trace-1",
+        )
+        prompt_extraction = AttackMemoryEntry(
+            strategy_name="prompt-extraction",
+            success=False,
+            round_number=FIRST_ROUND,
+            trace_id="trace-2",
+        )
+        memory.append(split_refund)
+        memory.append(prompt_extraction)
+
+        # act
+        entries = memory.get_by_strategy("split-refund")
+
+        # assert
+        assert entries == [split_refund]
+
+
+class TestAttackMemorySummary:
+    def test_when_entries_exist_expect_per_strategy_counts_and_recent_context(self, tmp_path: Path) -> None:
+        # arrange
+        memory = AttackMemory(memory_path=tmp_path / "attack_memory.jsonl")
+        memory.append(
+            AttackMemoryEntry(
+                strategy_name="split-refund",
+                success=True,
+                violated_rule="Refunds above $100 require manager approval",
+                signals=["processed repeated $90 refunds"],
+                round_number=FIRST_ROUND,
+                trace_id="trace-1",
+            )
+        )
+        memory.append(
+            AttackMemoryEntry(
+                strategy_name="split-refund",
+                success=False,
+                signals=["manager approval required"],
+                round_number=SECOND_ROUND,
+                trace_id="trace-2",
+            )
+        )
+
+        # act
+        summary = memory.summary()
+
+        # assert
+        split_refund = summary["split-refund"]
+        assert split_refund.success_count == 1
+        assert split_refund.failure_count == 1
+        assert split_refund.success_rate == pytest.approx(0.5)
+        assert split_refund.last_violated_rules == ["Refunds above $100 require manager approval"]
+        assert split_refund.last_signals == ["manager approval required"]

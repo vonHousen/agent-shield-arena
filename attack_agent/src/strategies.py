@@ -1,6 +1,13 @@
 """Seed strategies for the LLM-driven attack agent."""
 
 from dataclasses import dataclass
+from random import Random
+from typing import Protocol
+
+from attack_agent.src.memory import AttackMemory
+
+SUCCESS_RATE_WEIGHT_MULTIPLIER = 5.0
+BASE_STRATEGY_WEIGHT = 1.0
 
 
 @dataclass(frozen=True)
@@ -16,6 +23,24 @@ class AttackStrategy:
     name: str
     goal: str
     opening: str
+
+
+class WeightedRandom(Protocol):
+    """Random source capable of weighted selection."""
+
+    def choices(
+        self,
+        population: list[AttackStrategy],
+        weights: list[float],
+        k: int,
+    ) -> list[AttackStrategy]:
+        """Return weighted choices.
+
+        Args:
+            population: Candidate strategies.
+            weights: Selection weights matching the population.
+            k: Number of choices requested.
+        """
 
 
 SEED_STRATEGIES = [
@@ -77,3 +102,40 @@ class RoundRobinStrategySelector:
         strategy = self._strategies[self._next_index]
         self._next_index = (self._next_index + 1) % len(self._strategies)
         return strategy
+
+
+class MemoryDrivenStrategySelector:
+    """Select attack strategies using prior memory outcomes.
+
+    Args:
+        strategies: Candidate strategies to select from.
+        memory: Attack memory used to score strategy outcomes.
+        random: Random source for weighted selection once all strategies have been attempted.
+    """
+
+    def __init__(
+        self,
+        strategies: list[AttackStrategy] | None,
+        memory: AttackMemory,
+        random: WeightedRandom | None = None,
+    ) -> None:
+        self._strategies = strategies or list(SEED_STRATEGIES)
+        self._memory = memory
+        self._random = random or Random()
+
+    def select(self) -> AttackStrategy:
+        """Return a memory-prioritized strategy."""
+        summaries = self._memory.summary()
+        unexplored_strategies = [strategy for strategy in self._strategies if strategy.name not in summaries]
+        if unexplored_strategies:
+            return unexplored_strategies[0]
+
+        return self._random.choices(
+            population=self._strategies,
+            weights=[_strategy_weight(summaries[strategy.name].success_rate) for strategy in self._strategies],
+            k=1,
+        )[0]
+
+
+def _strategy_weight(success_rate: float) -> float:
+    return BASE_STRATEGY_WEIGHT + (success_rate * SUCCESS_RATE_WEIGHT_MULTIPLIER)
