@@ -25,6 +25,8 @@ class Settings(BaseSettings):
         description="When False, successful attacks are repeated as-is; when True, suggested mutations are applied.",
     )
 
+    defender_enabled: bool = Field(default=True, description="Toggle to run the arena with or without the Defender")
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 

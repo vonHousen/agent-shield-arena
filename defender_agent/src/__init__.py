@@ -1,0 +1,1 @@
+"""Defender agent implementation."""

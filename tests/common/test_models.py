@@ -8,12 +8,14 @@ from common.src.models import (
     AttackerReasoning,
     AttackReflection,
     ConversationTurn,
+    DefenderDecision,
     EvaluationVerdict,
     EventType,
     Role,
     RoundStarted,
     Trace,
     TracedToolExecution,
+    TriageDecision,
 )
 
 
@@ -309,3 +311,212 @@ class TestAttackerReasoning:
         assert restored.event_type == EventType.ATTACKER_REASONING
         assert isinstance(restored.payload, AttackerReasoning)
         assert restored.payload.turn_number == 3
+
+
+class TestDefenderDecision:
+    def test_when_constructed_expect_default_decision_id_generated(self) -> None:
+        # act
+        decision = DefenderDecision(
+            checkpoint="on_user_input",
+            decision="ALLOW",
+            reason="Message appears legitimate.",
+        )
+
+        # assert
+        assert decision.decision_id
+        assert len(decision.decision_id) == 32
+
+    def test_when_block_with_patterns_expect_all_fields_populated(self) -> None:
+        # act
+        decision = DefenderDecision(
+            checkpoint="on_tool_call",
+            decision="BLOCK",
+            reason="Multiple small refunds detected on same order.",
+            matched_patterns=["pattern-001", "pattern-002"],
+            confidence=0.95,
+        )
+
+        # assert
+        assert decision.checkpoint == "on_tool_call"
+        assert decision.decision == "BLOCK"
+        assert decision.reason == "Multiple small refunds detected on same order."
+        assert decision.matched_patterns == ["pattern-001", "pattern-002"]
+        assert decision.confidence == 0.95
+
+    def test_when_allow_with_no_patterns_expect_defaults(self) -> None:
+        # act
+        decision = DefenderDecision(
+            checkpoint="on_user_input",
+            decision="ALLOW",
+            reason="Normal customer inquiry.",
+        )
+
+        # assert
+        assert decision.matched_patterns == []
+        assert decision.confidence is None
+
+    def test_when_serialized_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        decision = DefenderDecision(
+            decision_id="def-001",
+            checkpoint="on_tool_call",
+            decision="BLOCK",
+            reason="Split-refund pattern detected.",
+            matched_patterns=["pattern-split-refund"],
+            confidence=0.92,
+        )
+
+        # act
+        json_str = decision.model_dump_json()
+        restored = DefenderDecision.model_validate_json(json_str)
+
+        # assert
+        assert restored.decision_id == "def-001"
+        assert restored.checkpoint == "on_tool_call"
+        assert restored.decision == "BLOCK"
+        assert restored.matched_patterns == ["pattern-split-refund"]
+        assert restored.confidence == 0.92
+
+
+class TestTriageDecision:
+    def test_when_constructed_expect_default_triage_id_generated(self) -> None:
+        # act
+        triage = TriageDecision(
+            trace_id="trace-1",
+            remediation_path="defender_memory",
+            pattern_description="Multiple small refunds on same order.",
+            rationale="Pattern-based detection can catch this.",
+        )
+
+        # assert
+        assert triage.triage_id
+        assert len(triage.triage_id) == 32
+
+    def test_when_defender_memory_path_expect_fields_populated(self) -> None:
+        # act
+        triage = TriageDecision(
+            trace_id="trace-1",
+            remediation_path="defender_memory",
+            pattern_description="Multiple small refunds below threshold on same order.",
+            affected_component="process_refund",
+            rationale="The Defender can recognize this pattern with memory.",
+        )
+
+        # assert
+        assert triage.remediation_path == "defender_memory"
+        assert triage.pattern_description == "Multiple small refunds below threshold on same order."
+        assert triage.affected_component == "process_refund"
+
+    def test_when_code_change_path_expect_fields_populated(self) -> None:
+        # act
+        triage = TriageDecision(
+            trace_id="trace-2",
+            remediation_path="code_change",
+            pattern_description="System lacks identity verification — no auth beyond lookup_customer.",
+            affected_component="lookup_customer",
+            rationale="Structural flaw that requires code-level fix, not pattern matching.",
+        )
+
+        # assert
+        assert triage.remediation_path == "code_change"
+        assert "identity verification" in triage.pattern_description
+
+    def test_when_affected_component_omitted_expect_none(self) -> None:
+        # act
+        triage = TriageDecision(
+            trace_id="trace-3",
+            remediation_path="defender_memory",
+            pattern_description="Some pattern.",
+            rationale="Some rationale.",
+        )
+
+        # assert
+        assert triage.affected_component is None
+
+    def test_when_serialized_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        triage = TriageDecision(
+            triage_id="triage-001",
+            trace_id="trace-1",
+            remediation_path="defender_memory",
+            pattern_description="Split-refund bypass pattern.",
+            affected_component="process_refund",
+            rationale="Defender can learn this pattern.",
+        )
+
+        # act
+        json_str = triage.model_dump_json()
+        restored = TriageDecision.model_validate_json(json_str)
+
+        # assert
+        assert restored.triage_id == "triage-001"
+        assert restored.trace_id == "trace-1"
+        assert restored.remediation_path == "defender_memory"
+        assert restored.affected_component == "process_refund"
+
+
+class TestArenaEventWithDefenderDecision:
+    def test_when_defender_decision_payload_expect_valid_event(self) -> None:
+        # arrange
+        decision = DefenderDecision(
+            checkpoint="on_user_input",
+            decision="BLOCK",
+            reason="Prompt injection attempt detected.",
+            confidence=0.98,
+        )
+
+        # act
+        event = ArenaEvent(event_type=EventType.DEFENDER_DECISION, payload=decision)
+
+        # assert
+        assert event.event_type == EventType.DEFENDER_DECISION
+        assert isinstance(event.payload, DefenderDecision)
+        assert event.payload.decision == "BLOCK"
+
+    def test_when_serialized_as_event_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        decision = DefenderDecision(
+            checkpoint="on_tool_call",
+            decision="ALLOW",
+            reason="Legitimate refund request.",
+        )
+        event = ArenaEvent(event_type=EventType.DEFENDER_DECISION, payload=decision)
+
+        # act
+        json_str = event.model_dump_json()
+        restored = ArenaEvent.model_validate_json(json_str)
+
+        # assert
+        assert restored.event_type == EventType.DEFENDER_DECISION
+        assert isinstance(restored.payload, DefenderDecision)
+        assert restored.payload.checkpoint == "on_tool_call"
+        assert restored.payload.decision == "ALLOW"
+
+
+class TestArenaEventWithTriageDecision:
+    def test_when_triage_decision_payload_expect_valid_event(self) -> None:
+        # arrange
+        triage = TriageDecision(
+            trace_id="trace-1",
+            remediation_path="defender_memory",
+            pattern_description="Split-refund bypass.",
+            rationale="Pattern-based fix.",
+        )
+
+        # act
+        event = ArenaEvent(event_type=EventType.TRIAGE_DECISION, payload=triage)
+
+        # assert
+        assert event.event_type == EventType.TRIAGE_DECISION
+        assert isinstance(event.payload, TriageDecision)
+        assert event.payload.remediation_path == "defender_memory"
+
+
+class TestEventTypeDefender:
+    def test_when_defender_decision_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.DEFENDER_DECISION == "defender_decision"
+
+    def test_when_triage_decision_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.TRIAGE_DECISION == "triage_decision"

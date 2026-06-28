@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -20,6 +20,8 @@ class EventType(StrEnum):
     ATTACK_REFLECTION = "attack_reflection"
     ATTACK_BRIEFING = "attack_briefing"
     ATTACKER_REASONING = "attacker_reasoning"
+    DEFENDER_DECISION = "defender_decision"
+    TRIAGE_DECISION = "triage_decision"
 
 
 class Role(StrEnum):
@@ -195,6 +197,46 @@ class AttackerReasoning(BaseModel):
     reasoning: str
 
 
+class DefenderDecision(BaseModel):
+    """Output of a Defender checkpoint evaluation.
+
+    Args:
+        decision_id: Unique identifier for this decision.
+        checkpoint: Which checkpoint produced this decision.
+        decision: Whether the input or tool call was blocked or allowed.
+        reason: Human-readable explanation of the decision.
+        matched_patterns: Memory pattern IDs that triggered the decision (empty when no memory).
+        confidence: Optional LLM confidence score for the decision.
+    """
+
+    decision_id: str = Field(default_factory=lambda: uuid4().hex)
+    checkpoint: Literal["on_user_input", "on_tool_call"]
+    decision: Literal["BLOCK", "ALLOW"]
+    reason: str
+    matched_patterns: list[str] = Field(default_factory=list)
+    confidence: float | None = None
+
+
+class TriageDecision(BaseModel):
+    """Triage agent output classifying a successful attack into a remediation path.
+
+    Args:
+        triage_id: Unique identifier for this triage decision.
+        trace_id: Identifier of the trace that was triaged.
+        remediation_path: Whether to update defender memory or propose a code change.
+        pattern_description: What to store in defender memory, or what structural fix is needed.
+        affected_component: The system component involved (e.g. "process_refund").
+        rationale: Why this remediation path was chosen.
+    """
+
+    triage_id: str = Field(default_factory=lambda: uuid4().hex)
+    trace_id: str
+    remediation_path: Literal["defender_memory", "code_change"]
+    pattern_description: str
+    affected_component: str | None = None
+    rationale: str
+
+
 class ArenaEvent(BaseModel):
     """Single event in the arena event stream.
 
@@ -217,4 +259,6 @@ class ArenaEvent(BaseModel):
         | AttackReflection
         | AttackBriefing
         | AttackerReasoning
+        | DefenderDecision
+        | TriageDecision
     )
