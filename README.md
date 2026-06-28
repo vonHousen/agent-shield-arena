@@ -56,6 +56,6 @@ Use `just` as task runner (use `just --list` to list all recipes).
 Run in separate terminals:
 
 ```bash
-just dashboard   # start the live dashboard (http://127.0.0.1:8080)
-just run         # run the Arena demo → data/events/arena_events.jsonl
+just dashboard reload=true  # start the live dashboard (http://127.0.0.1:8080)
+just run                    # run the Arena demo → data/events/arena_events.jsonl
 ```
