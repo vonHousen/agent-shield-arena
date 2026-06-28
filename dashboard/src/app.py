@@ -9,10 +9,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from common.src.event_emitter import DEFAULT_EVENTS_PATH
+from common.src.logging import setup_logging
 from dashboard.src.event_watcher import ResetSignal, watch_events
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
+DEFAULT_LOG_FILE = Path("data/logs/dashboard.log")
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 INDEX_FILE = STATIC_DIR / "index.html"
 RESET_MESSAGE = '{"type": "reset"}'
@@ -59,8 +61,12 @@ def main(
     host: str = typer.Option(DEFAULT_HOST, help="Host to bind the dashboard server to."),
     port: int = typer.Option(DEFAULT_PORT, help="Port to bind the dashboard server to."),
     reload: bool = typer.Option(False, help="Enable auto-reload on code changes."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable DEBUG-level logging."),
+    log_file: Path = typer.Option(DEFAULT_LOG_FILE, help=f"Log file path. Defaults to {DEFAULT_LOG_FILE}."),
 ) -> None:
     """Run the dashboard development server."""
+    setup_logging(verbose=verbose, log_file=log_file)
+
     if reload:
         uvicorn.run(
             "dashboard.src.app:app",

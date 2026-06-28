@@ -40,6 +40,15 @@ from common.src.config import settings
 response = client.chat(model=settings.bifrost_model, ...)
 ```
 
+## Logging
+
+Both the runner and dashboard write structured logs to `data/logs/` via Python's `logging` module:
+
+- **Runner** → `data/logs/arena.log`
+- **Dashboard** → `data/logs/dashboard.log`
+
+Pass `--verbose` for DEBUG-level output or `--log-file <path>` to override the default location.
+
 ## Quick Start
 
 ```bash
