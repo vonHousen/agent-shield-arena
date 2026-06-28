@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     bifrost_api_key: str = Field(description="Bifrost API key")
     bifrost_model: str = Field(default="azure/gpt-5.4", description="Model identifier for LiteLLM")
 
-    attack_max_messages: int = Field(default=10, description="Attack Agent message budget per conversation")
-    runner_max_turns: int = Field(default=12, description="Runner hard ceiling (safety net, > attack budget)")
+    attack_max_messages: int = Field(default=6, description="Attack Agent message budget per conversation")
+    runner_max_turns: int = Field(default=8, description="Runner hard ceiling (safety net, > attack budget)")
     runner_turn_delay_seconds: float = Field(default=0.0, description="Pause between turns for demo pacing")
 
     arena_rounds: int = Field(default=3, description="Number of arena rounds in a multi-round session")
