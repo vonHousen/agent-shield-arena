@@ -6,7 +6,17 @@ from typing import Protocol
 
 from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
-from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ScenarioStarted, ToolCall, ToolResult
+from common.src.models import (
+    ArenaEvent,
+    ConversationTurn,
+    EventType,
+    Role,
+    RunCompleted,
+    RunStarted,
+    ScenarioStarted,
+    ToolCall,
+    ToolResult,
+)
 from runner.src.models import ShieldedSystemResponse
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
@@ -111,22 +121,45 @@ async def run_all_scenarios(
         event_emitter: Sink for arena events.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
     """
+    all_scenarios = get_all_scenarios()
     all_responses: dict[str, list[ShieldedSystemResponse]] = {}
 
-    for name, messages in get_all_scenarios().items():
-        logger.info(f"=== Starting scenario: {name} ===")
-        responses = await run_attack_scenario(
-            shielded_system=shielded_system,
-            event_emitter=event_emitter,
-            messages=messages,
-            scenario_name=name,
-            turn_delay_seconds=turn_delay_seconds,
-        )
-        all_responses[name] = responses
-        await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+    _emit_run_started(event_emitter, len(all_scenarios))
+    try:
+        for name, messages in all_scenarios.items():
+            logger.info(f"=== Starting scenario: {name} ===")
+            responses = await run_attack_scenario(
+                shielded_system=shielded_system,
+                event_emitter=event_emitter,
+                messages=messages,
+                scenario_name=name,
+                turn_delay_seconds=turn_delay_seconds,
+            )
+            all_responses[name] = responses
+            await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+    finally:
+        _emit_run_completed(event_emitter)
 
     logger.info(f"All {len(all_responses)} scenarios complete")
     return all_responses
+
+
+def _emit_run_started(event_emitter: EventEmitter, scenario_count: int) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.RUN_STARTED,
+            payload=RunStarted(scenario_count=scenario_count),
+        )
+    )
+
+
+def _emit_run_completed(event_emitter: EventEmitter) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.RUN_COMPLETED,
+            payload=RunCompleted(),
+        )
+    )
 
 
 def _emit_scenario_started(event_emitter: EventEmitter, scenario_name: str) -> None:

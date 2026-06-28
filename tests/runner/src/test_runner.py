@@ -4,8 +4,8 @@ import json
 
 from common.src.event_emitter import EventEmitter
 from runner.src.mock_system import MockShieldedSystem
-from runner.src.runner import run_attack_scenario
-from runner.src.scenario import get_split_refund_bypass_scenario
+from runner.src.runner import run_all_scenarios, run_attack_scenario
+from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
 
 class TestRunAttackScenario:
@@ -67,3 +67,25 @@ class TestRunAttackScenario:
         # assert
         refund_ids = [response.tool_executions[0].result["refund_id"] for response in responses]
         assert refund_ids == expected_refund_ids
+
+
+class TestRunAllScenarios:
+    async def test_when_all_scenarios_run_expect_run_started_and_run_completed_events(self, tmp_path) -> None:
+        """Verify run_all_scenarios wraps everything with run_started and run_completed."""
+        # arrange
+        events_path = tmp_path / "events.jsonl"
+        event_emitter = EventEmitter(events_path)
+        expected_scenario_count = len(get_all_scenarios())
+
+        # act
+        await run_all_scenarios(
+            shielded_system=MockShieldedSystem(),
+            event_emitter=event_emitter,
+            turn_delay_seconds=0,
+        )
+
+        # assert
+        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        assert events[0]["event_type"] == "run_started"
+        assert events[0]["payload"]["scenario_count"] == expected_scenario_count
+        assert events[-1]["event_type"] == "run_completed"

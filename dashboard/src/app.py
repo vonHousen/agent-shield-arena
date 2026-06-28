@@ -62,7 +62,13 @@ def main(
 ) -> None:
     """Run the dashboard development server."""
     if reload:
-        uvicorn.run("dashboard.src.app:app", host=host, port=port, reload=True)
+        uvicorn.run(
+            "dashboard.src.app:app",
+            host=host,
+            port=port,
+            reload=True,
+            reload_dirs=["dashboard", "common"],
+        )
     else:
         uvicorn.run(create_app(events_file), host=host, port=port)
 

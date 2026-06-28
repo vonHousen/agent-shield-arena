@@ -43,7 +43,7 @@ function connectWebSocket() {
 
   socket.addEventListener("open", () => {
     resetState();
-    setStatus("Running", "running");
+    setStatus("Idle", "idle");
   });
 
   socket.addEventListener("message", (message) => {
@@ -72,6 +72,16 @@ function renderEvent(event) {
   elements.eventCount.textContent = formatCount(state.events, "event");
   elements.latestType.textContent = event.event_type;
   elements.latestTimestamp.textContent = formatTimestamp(event.timestamp);
+
+  if (event.event_type === "run_started") {
+    setStatus("Running", "running");
+    return;
+  }
+
+  if (event.event_type === "run_completed") {
+    setStatus("Completed", "completed");
+    return;
+  }
 
   if (event.event_type === "scenario_started") {
     handleScenarioStarted(event.payload);
@@ -269,6 +279,11 @@ function setStatus(label, status) {
     return;
   }
 
+  if (status === "completed") {
+    elements.statusBadge.classList.add("border-sky-500/40", "bg-sky-500/10", "text-sky-300");
+    return;
+  }
+
   elements.statusBadge.classList.add("border-zinc-700", "text-zinc-300");
 }
 
@@ -288,6 +303,7 @@ function resetState() {
   elements.eventCount.textContent = "0 events";
   elements.latestType.textContent = "None";
   elements.latestTimestamp.textContent = "None";
+  setStatus("Idle", "idle");
   updateMetrics();
 }
 
