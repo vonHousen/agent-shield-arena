@@ -59,8 +59,10 @@ class TestMain:
         ):
             runner_main.main(
                 events_dir=events_dir,
+                memory_dir=tmp_path / "memory",
                 delay=0,
                 mock=True,
+                rounds=1,
                 verbose=False,
                 log_file=tmp_path / "arena.log",
                 scenario="all",
@@ -86,9 +88,11 @@ class TestMain:
         ):
             runner_main.main(
                 events_dir=events_dir,
+                memory_dir=tmp_path / "memory",
                 delay=0,
                 mock=True,
                 mode="llm",
+                rounds=1,
                 verbose=False,
                 log_file=tmp_path / "arena.log",
                 scenario="all",
@@ -103,6 +107,44 @@ class TestMain:
         ]
         assert attacker_messages == ["attack from test-alpha", "attack from test-beta"]
 
+    def test_when_mode_llm_with_rounds_expect_memory_artifacts_created(self, tmp_path: Path) -> None:
+        """Verify LLM mode runs the v3 arena loop and writes matching memory artifacts."""
+        # arrange
+        events_dir = tmp_path / "events"
+        memory_dir = tmp_path / "memory"
+        rounds = 2
+
+        # act
+        with (
+            patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
+            patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+        ):
+            runner_main.main(
+                events_dir=events_dir,
+                memory_dir=memory_dir,
+                delay=0,
+                mock=True,
+                mode="llm",
+                rounds=rounds,
+                verbose=False,
+                log_file=tmp_path / "arena.log",
+                scenario="all",
+            )
+
+        # assert
+        events = _read_events(events_dir)
+        memory_latest = memory_dir / "latest"
+        memory_entries = (memory_latest / "attack_memory.jsonl").read_text().splitlines()
+        trace_files = sorted(memory_latest.glob("round_*/traces/*.json"))
+        round_events = [event for event in events if event["event_type"] == "round_started"]
+        verdict_events = [event for event in events if event["event_type"] == "evaluation_verdict"]
+
+        assert memory_latest.resolve().name == (events_dir / "latest").resolve().name
+        assert len(round_events) == rounds
+        assert len(verdict_events) == rounds * len(TWO_TEST_STRATEGIES)
+        assert len(memory_entries) == rounds * len(TWO_TEST_STRATEGIES)
+        assert len(trace_files) == rounds * len(TWO_TEST_STRATEGIES)
+
     def test_when_invalid_mode_expect_bad_parameter(self, tmp_path: Path) -> None:
         """Verify CLI mode validation rejects unknown modes."""
         # arrange
@@ -112,9 +154,11 @@ class TestMain:
         try:
             runner_main.main(
                 events_dir=tmp_path / "events",
+                memory_dir=tmp_path / "memory",
                 delay=0,
                 mock=True,
                 mode=invalid_mode,
+                rounds=1,
                 verbose=False,
                 log_file=tmp_path / "arena.log",
                 scenario="all",

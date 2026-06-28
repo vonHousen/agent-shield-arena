@@ -14,13 +14,15 @@ test:
     uv run --extra dev pytest
 
 # Delete all arena run history so the next run starts fresh.
-clear events_dir="data/events":
+clear events_dir="data/events" memory_dir="data/memory":
     rm -rf {{ events_dir }}/*/
     rm -f {{ events_dir }}/latest {{ events_dir }}/*.jsonl
+    rm -rf {{ memory_dir }}/*/
+    rm -f {{ memory_dir }}/latest {{ memory_dir }}/*.jsonl
 
-# Run the arena scenario and write JSONL events into a new timestamped directory.
-run events_dir="data/events":
-    uv run python -m runner.src --events-dir {{ events_dir }}
+# Run the arena and write JSONL events plus memory artifacts into timestamped directories.
+run rounds="3" events_dir="data/events" memory_dir="data/memory":
+    uv run python -m runner.src --rounds {{ rounds }} --events-dir {{ events_dir }} --memory-dir {{ memory_dir }}
 
 # Start the live dashboard server (pass 'true' to enable code hot-reload).
 dashboard reload="false":
