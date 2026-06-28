@@ -18,8 +18,8 @@ clear events_path="data/events/arena_events.jsonl":
     rm -f {{ events_path }}
 
 # Run the arena scenario and write JSONL events.
-run delay="1" events_path="data/events/arena_events.jsonl":
-    uv run python -m runner.src --delay {{ delay }} --events-path {{ events_path }}
+run events_path="data/events/arena_events.jsonl":
+    uv run python -m runner.src --events-path {{ events_path }}
 
 # Start the live dashboard server (pass 'true' to enable code hot-reload).
 dashboard reload="false":

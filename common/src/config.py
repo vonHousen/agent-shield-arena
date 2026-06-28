@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     attack_max_messages: int = Field(default=10, description="Attack Agent message budget per conversation")
     runner_max_turns: int = Field(default=12, description="Runner hard ceiling (safety net, > attack budget)")
-    runner_turn_delay_seconds: float = Field(default=1.0, description="Pause between turns for demo pacing")
+    runner_turn_delay_seconds: float = Field(default=0.0, description="Pause between turns for demo pacing")
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
