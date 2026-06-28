@@ -4,7 +4,7 @@ from typing import Protocol
 
 from common.src.event_emitter import EventEmitter
 from common.src.models import ArenaEvent, DefenderDecision, EventType
-from runner.src.models import ShieldedSystemResponse
+from runner.src.models import ShieldedSystemResponse, ToolExecution
 
 BLOCKED_RESPONSE = "[BLOCKED BY DEFENDER] This request was flagged as potentially malicious."
 BLOCK_DECISION = "BLOCK"
@@ -81,6 +81,7 @@ class DefendedSystem:
             return ShieldedSystemResponse(content=BLOCKED_RESPONSE)
 
         response = await self._inner_system.chat(message, history)
+        evaluated_tool_executions: list[ToolExecution] = []
         for tool_execution in response.tool_executions:
             tool_decision = await self._defender.on_tool_call(
                 tool_name=tool_execution.tool_name,
@@ -90,8 +91,20 @@ class DefendedSystem:
             self._emit_decision(tool_decision)
             if tool_decision.decision == BLOCK_DECISION:
                 self._block_count += 1
+                evaluated_tool_executions.append(
+                    ToolExecution(
+                        tool_name=tool_execution.tool_name,
+                        arguments=tool_execution.arguments,
+                        result=_blocked_tool_result(tool_decision.reason),
+                    )
+                )
+            else:
+                evaluated_tool_executions.append(tool_execution)
 
-        return response
+        return ShieldedSystemResponse(
+            content=response.content,
+            tool_executions=evaluated_tool_executions,
+        )
 
     def consume_block_count(self) -> int:
         """Return and reset the number of BLOCK decisions since the last call."""
@@ -101,3 +114,12 @@ class DefendedSystem:
 
     def _emit_decision(self, decision: DefenderDecision) -> None:
         self._event_emitter.emit(ArenaEvent(event_type=EventType.DEFENDER_DECISION, payload=decision))
+
+
+def _blocked_tool_result(reason: str) -> dict[str, str]:
+    """Build a replacement tool result for a blocked tool call.
+
+    Args:
+        reason: Defender's explanation for why the tool call was blocked.
+    """
+    return {"status": "blocked", "reason": reason}

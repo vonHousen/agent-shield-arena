@@ -146,8 +146,13 @@ class TestDefendedSystem:
         response = await defended_system.chat("refund please", [])
 
         # assert
+        blocked_reason = "Known split-refund pattern."
         events = [json.loads(line) for line in events_path.read_text().splitlines()]
         assert response.content == "Refund processed."
+        assert len(response.tool_executions) == 1
+        assert response.tool_executions[0].tool_name == "process_refund"
+        assert response.tool_executions[0].arguments == refund_arguments
+        assert response.tool_executions[0].result == {"status": "blocked", "reason": blocked_reason}
         assert inner_system.messages == ["refund please"]
         assert defender.tool_calls == [("process_refund", refund_arguments)]
         assert defended_system.consume_block_count() == 1
