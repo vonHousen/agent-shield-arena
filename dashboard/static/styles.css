@@ -257,3 +257,124 @@ aside {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* Attacker reasoning bubble */
+.reasoning-bubble {
+  max-width: min(42rem, 88%);
+  border-left: 3px solid rgb(251 191 36 / 0.6);
+  background: rgb(251 191 36 / 0.08);
+  padding: 0.5rem 0.75rem;
+  opacity: 0.85;
+}
+
+.reasoning-label {
+  margin: 0 0 0.25rem;
+  color: #fbbf24;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.reasoning-text {
+  margin: 0;
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+  font-style: italic;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Adaptation timeline card */
+.adaptation-strategy {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgb(63 63 70 / 0.4);
+  margin-bottom: 1rem;
+}
+
+.adaptation-strategy:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.adaptation-strategy-title {
+  margin: 0 0 0.75rem;
+  color: #e4e4e7;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.adaptation-entry {
+  border-left: 3px solid;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0;
+}
+
+.adaptation-entry-defended {
+  border-color: #34d399;
+  background: rgb(16 185 129 / 0.06);
+}
+
+.adaptation-entry-breached {
+  border-color: #f87171;
+  background: rgb(239 68 68 / 0.06);
+}
+
+.adaptation-entry-header {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #e4e4e7;
+}
+
+.adaptation-entry-detail {
+  margin: 0 0 0.25rem;
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.adaptation-mutations {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  color: #a1a1aa;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.adaptation-arrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0 0.375rem 0.75rem;
+  color: #71717a;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.adaptation-arrow::before {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 1rem;
+  background: #52525b;
+  margin-left: 0.125rem;
+}
+
+.adaptation-arrow::after {
+  content: "▼";
+  font-size: 0.5rem;
+  color: #71717a;
+  position: absolute;
+  margin-left: -0.68rem;
+  margin-top: 0.75rem;
+}
+
+.adaptation-arrow {
+  position: relative;
+}

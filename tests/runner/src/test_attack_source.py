@@ -3,6 +3,8 @@
 from runner.src.attack_source import LLMAttackSource
 from shielded_system.src.models import ChatMessage, ChatRole
 
+ATTACK_MESSAGE = "next attack"
+
 
 class RecordingAttackAgent:
     """Attack agent test double that records converted history."""
@@ -18,7 +20,7 @@ class RecordingAttackAgent:
             conversation_history: Conversation history converted for the attack agent.
         """
         self.histories.append(conversation_history)
-        return "next attack"
+        return ATTACK_MESSAGE
 
 
 class TestLLMAttackSourceNextMessage:
@@ -34,8 +36,10 @@ class TestLLMAttackSourceNextMessage:
         ]
 
         # act
-        message = await attack_source.next_message(history)
+        result = await attack_source.next_message(history)
 
         # assert
-        assert message == "next attack"
+        assert result is not None
+        assert result.message == ATTACK_MESSAGE
+        assert result.reasoning is None
         assert attack_agent.histories == [expected_history]

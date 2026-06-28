@@ -20,6 +20,9 @@ const state = {
     [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 },
   },
 
+  reflections: [],
+  briefings: {},
+
   selectedRun: "latest",
   socket: null,
 };
@@ -41,6 +44,8 @@ const elements = {
   runSelector: document.querySelector("#runSelector"),
   roundComparisonCard: document.querySelector("#roundComparisonCard"),
   roundComparison: document.querySelector("#roundComparison"),
+  adaptationCard: document.querySelector("#adaptationCard"),
+  adaptationContent: document.querySelector("#adaptationContent"),
 };
 
 elements.scrollButton.addEventListener("click", () => {
@@ -176,6 +181,16 @@ function renderEvent(event) {
     handleScenarioStarted(event.payload);
     updateMetrics();
     updateHeaderSummary();
+    return;
+  }
+
+  if (event.event_type === "attack_briefing") {
+    handleAttackBriefing(event.payload);
+    return;
+  }
+
+  if (event.event_type === "attack_reflection") {
+    handleAttackReflection(event.payload);
     return;
   }
 
@@ -340,6 +355,11 @@ function storeEvent(event) {
 }
 
 function handleConversationEvent(event) {
+  if (event.event_type === "attacker_reasoning") {
+    renderIfVisible(event, appendAttackerReasoning);
+    return;
+  }
+
   if (event.event_type === "conversation_turn") {
     incrementMetric("messages");
     renderIfVisible(event, appendConversationTurn);
@@ -502,7 +522,9 @@ function rerenderConversation() {
   }
 
   for (const event of events) {
-    if (event.event_type === "conversation_turn") {
+    if (event.event_type === "attacker_reasoning") {
+      appendAttackerReasoning(event.payload);
+    } else if (event.event_type === "conversation_turn") {
       appendConversationTurn(event.payload);
     } else if (event.event_type === "tool_call") {
       appendToolCall(event.payload);
@@ -665,6 +687,9 @@ function resetState() {
   state.scenarioMetadata = {};
   state.scenarioMetrics = { [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 } };
 
+  state.reflections = [];
+  state.briefings = {};
+
   elements.roundSelector.querySelectorAll(".round-button").forEach((button) => button.remove());
   elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => tab.remove());
 
@@ -674,6 +699,8 @@ function resetState() {
   clearVerdictCard();
   elements.roundComparison.innerHTML = "";
   elements.roundComparisonCard.classList.add("hidden");
+  elements.adaptationContent.innerHTML = "";
+  elements.adaptationCard.classList.add("hidden");
   setStatus("Idle", "idle");
   updateMetrics();
 }
@@ -778,4 +805,121 @@ function isConversationNearBottom() {
 function scrollConversationToBottom() {
   elements.conversation.scrollTop = elements.conversation.scrollHeight;
   elements.scrollButton.classList.add("hidden");
+}
+
+function appendAttackerReasoning(payload) {
+  const row = document.createElement("div");
+  row.className = "message-row message-row-left";
+
+  const bubble = document.createElement("div");
+  bubble.className = "reasoning-bubble";
+
+  const label = document.createElement("p");
+  label.className = "reasoning-label";
+  label.textContent = "Attacker Reasoning";
+
+  const text = document.createElement("p");
+  text.className = "reasoning-text";
+  text.textContent = payload.reasoning;
+
+  bubble.append(label, text);
+  row.append(bubble);
+  appendConversationNode(row);
+}
+
+function handleAttackBriefing(payload) {
+  const key = `${payload.strategy_name}:${payload.round_number}`;
+  state.briefings[key] = payload;
+  renderAdaptationCard();
+}
+
+function handleAttackReflection(payload) {
+  state.reflections.push(payload);
+  renderAdaptationCard();
+}
+
+function renderAdaptationCard() {
+  const container = elements.adaptationContent;
+  container.innerHTML = "";
+
+  if (state.reflections.length === 0) {
+    elements.adaptationCard.classList.add("hidden");
+    return;
+  }
+
+  elements.adaptationCard.classList.remove("hidden");
+
+  const strategies = [...new Set(state.reflections.map((r) => r.strategy_name))];
+
+  for (const strategyName of strategies) {
+    const strategyReflections = state.reflections
+      .filter((r) => r.strategy_name === strategyName)
+      .sort((a, b) => a.round_number - b.round_number);
+
+    const section = document.createElement("div");
+    section.className = "adaptation-strategy";
+
+    const title = document.createElement("p");
+    title.className = "adaptation-strategy-title";
+    title.textContent = humanizeName(strategyName);
+    section.append(title);
+
+    for (let i = 0; i < strategyReflections.length; i++) {
+      const reflection = strategyReflections[i];
+
+      if (i > 0) {
+        const arrow = document.createElement("div");
+        arrow.className = "adaptation-arrow";
+        arrow.textContent = "adapted";
+        section.append(arrow);
+      }
+
+      const entry = document.createElement("div");
+      entry.className = reflection.success ? "adaptation-entry adaptation-entry-breached" : "adaptation-entry adaptation-entry-defended";
+
+      const header = document.createElement("p");
+      header.className = "adaptation-entry-header";
+      header.textContent = `R${reflection.round_number} ${reflection.success ? "BREACHED" : "DEFENDED"}`;
+      entry.append(header);
+
+      const tactic = document.createElement("p");
+      tactic.className = "adaptation-entry-detail";
+      tactic.innerHTML = `<span class="text-zinc-500">Tactic:</span> "${reflection.tactic_used}"`;
+      entry.append(tactic);
+
+      if (reflection.success) {
+        const why = document.createElement("p");
+        why.className = "adaptation-entry-detail";
+        why.innerHTML = `<span class="text-zinc-500">Why:</span> ${reflection.why_outcome}`;
+        entry.append(why);
+      } else {
+        if (reflection.defensive_trigger) {
+          const blocked = document.createElement("p");
+          blocked.className = "adaptation-entry-detail";
+          blocked.innerHTML = `<span class="text-zinc-500">Blocked:</span> ${reflection.defensive_trigger}`;
+          entry.append(blocked);
+        }
+
+        if (reflection.suggested_mutations && reflection.suggested_mutations.length > 0) {
+          const mutLabel = document.createElement("p");
+          mutLabel.className = "adaptation-entry-detail text-zinc-500";
+          mutLabel.textContent = "Next moves:";
+          entry.append(mutLabel);
+
+          const mutList = document.createElement("ol");
+          mutList.className = "adaptation-mutations";
+          for (const mutation of reflection.suggested_mutations) {
+            const li = document.createElement("li");
+            li.textContent = mutation;
+            mutList.append(li);
+          }
+          entry.append(mutList);
+        }
+      }
+
+      section.append(entry);
+    }
+
+    container.append(section);
+  }
 }

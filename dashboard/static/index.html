@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AgentShield Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=7" />
   </head>
   <body class="flex h-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
     <header class="shrink-0 border-b border-zinc-800 bg-zinc-950/95">
@@ -84,6 +84,11 @@
           <div id="roundComparison" class="mt-4 flex flex-col gap-3 text-sm"></div>
         </section>
 
+        <section id="adaptationCard" class="hidden shrink-0 border border-zinc-800 bg-zinc-900 p-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Attack Adaptation</h2>
+          <div id="adaptationContent" class="mt-4 flex flex-col gap-0 text-sm"></div>
+        </section>
+
         <section class="shrink-0 border border-zinc-800 bg-zinc-900 p-4">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Evaluation Verdict</h2>
           <div id="verdictCard" class="mt-4 text-sm text-zinc-500">No verdict yet</div>
@@ -92,6 +97,6 @@
       </aside>
     </main>
 
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/app.js?v=7"></script>
   </body>
 </html>

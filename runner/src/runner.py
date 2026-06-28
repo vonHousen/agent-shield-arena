@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from attack_agent.src.agent import AttackAgent
+from attack_agent.src.agent import AttackAgent, build_memory_context
 from attack_agent.src.memory import AttackMemory, AttackMemoryEntry, TacticalReflection
 from attack_agent.src.reflector import TacticalReflector
 from attack_agent.src.strategies import SEED_STRATEGIES, AttackStrategy
@@ -14,6 +14,9 @@ from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
 from common.src.models import (
     ArenaEvent,
+    AttackBriefing,
+    AttackerReasoning,
+    AttackReflection,
     ConversationTurn,
     EvaluationVerdict,
     EventType,
@@ -109,6 +112,7 @@ async def run_attack_conversation(
     turn_delay_seconds: float = settings.runner_turn_delay_seconds,
     max_turns: int = settings.runner_max_turns,
     history: list[tuple[str, str]] | None = None,
+    round_number: int = 1,
 ) -> list[ShieldedSystemResponse]:
     """Run a dynamic attack conversation and emit JSONL events.
 
@@ -120,6 +124,7 @@ async def run_attack_conversation(
         turn_delay_seconds: Delay between turns for real-time demo pacing.
         max_turns: Hard ceiling for conversation turns.
         history: Optional mutable conversation history populated as the runner advances.
+        round_number: Current arena round number (used for reasoning event metadata).
     """
     conversation_history = history if history is not None else []
     responses: list[ShieldedSystemResponse] = []
@@ -128,11 +133,15 @@ async def run_attack_conversation(
     logger.info(f"Starting attack conversation '{scenario_name}' with max {max_turns} turns")
 
     for turn in range(1, max_turns + 1):
-        message = await attack_source.next_message(conversation_history)
-        if message is None:
+        attack_output = await attack_source.next_message(conversation_history)
+        if attack_output is None:
             logger.info(f"Attack source stopped conversation '{scenario_name}' after {len(responses)} responses")
             break
 
+        if attack_output.reasoning:
+            _emit_attacker_reasoning(event_emitter, scenario_name, round_number, turn, attack_output.reasoning)
+
+        message = attack_output.message
         logger.info(f"Turn {turn}/{max_turns} — sending user message: {message.replace('\n', '\\n')}")
         _emit_conversation_turn(event_emitter, Role.USER, message)
         conversation_history.append((Role.USER.value, message))
@@ -201,6 +210,11 @@ async def run_arena(
                 reset_customer_db()
                 history: list[tuple[str, str]] = []
                 attack_source = _attack_source_for_strategy(strategy, round_number, attack_source_factory, memory)
+
+                memory_context = build_memory_context(strategy, memory)
+                if memory_context:
+                    _emit_attack_briefing(event_emitter, strategy.name, round_number, memory_context)
+
                 responses = await run_attack_conversation(
                     shielded_system=shielded_system,
                     event_emitter=event_emitter,
@@ -208,6 +222,7 @@ async def run_arena(
                     scenario_name=strategy.name,
                     turn_delay_seconds=turn_delay_seconds,
                     history=history,
+                    round_number=round_number,
                 )
                 trace = build_trace(
                     scenario_name=strategy.name,
@@ -220,6 +235,7 @@ async def run_arena(
                 reflection = await arena_reflector.reflect(trace=trace, verdict=verdict)
                 memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict, reflection))
                 _emit_evaluation_verdict(event_emitter, verdict)
+                _emit_attack_reflection(event_emitter, strategy.name, round_number, verdict, reflection)
                 strategy_results.append(
                     StrategyResult(
                         strategy_name=strategy.name,
@@ -407,6 +423,67 @@ def _emit_tool_result(event_emitter: EventEmitter, tool_name: str, result: objec
         ArenaEvent(
             event_type=EventType.TOOL_RESULT,
             payload=ToolResult(tool_name=tool_name, result=result),
+        )
+    )
+
+
+def _emit_attacker_reasoning(
+    event_emitter: EventEmitter,
+    strategy_name: str,
+    round_number: int,
+    turn_number: int,
+    reasoning: str,
+) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.ATTACKER_REASONING,
+            payload=AttackerReasoning(
+                strategy_name=strategy_name,
+                round_number=round_number,
+                turn_number=turn_number,
+                reasoning=reasoning,
+            ),
+        )
+    )
+
+
+def _emit_attack_briefing(
+    event_emitter: EventEmitter,
+    strategy_name: str,
+    round_number: int,
+    memory_context: str,
+) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.ATTACK_BRIEFING,
+            payload=AttackBriefing(
+                strategy_name=strategy_name,
+                round_number=round_number,
+                memory_context=memory_context,
+            ),
+        )
+    )
+
+
+def _emit_attack_reflection(
+    event_emitter: EventEmitter,
+    strategy_name: str,
+    round_number: int,
+    verdict: EvaluationVerdict,
+    reflection: TacticalReflection,
+) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.ATTACK_REFLECTION,
+            payload=AttackReflection(
+                strategy_name=strategy_name,
+                round_number=round_number,
+                success=verdict.success,
+                tactic_used=reflection.tactic_used,
+                why_outcome=reflection.why_outcome,
+                defensive_trigger=reflection.defensive_trigger,
+                suggested_mutations=reflection.suggested_mutations,
+            ),
         )
     )
 

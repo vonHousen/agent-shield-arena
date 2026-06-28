@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from attack_agent.src.agent import AttackOutput
 from attack_agent.src.memory import AttackMemory, TacticalReflection
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EventEmitter
@@ -245,7 +246,7 @@ class FakeAttackAgent:
         self.strategy = strategy
         self._sent = False
 
-    async def generate_attack(self, conversation_history: list[ChatMessage]) -> str | None:
+    async def generate_attack(self, conversation_history: list[ChatMessage]) -> AttackOutput | None:
         """Return one message then stop.
 
         Args:
@@ -254,7 +255,8 @@ class FakeAttackAgent:
         if self._sent:
             return None
         self._sent = True
-        return f"attack from {self.strategy.name}" if self.strategy else "attack"
+        message = f"attack from {self.strategy.name}" if self.strategy else "attack"
+        return AttackOutput(message=message, reasoning=None)
 
 
 class TestRunAllLlmScenarios:

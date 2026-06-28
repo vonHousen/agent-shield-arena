@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from common.src.models import (
     ArenaEvent,
+    AttackBriefing,
+    AttackerReasoning,
+    AttackReflection,
     ConversationTurn,
     EvaluationVerdict,
     EventType,
@@ -182,3 +185,127 @@ class TestEventType:
     def test_when_round_started_expect_string_value(self) -> None:
         # act / assert
         assert EventType.ROUND_STARTED == "round_started"
+
+    def test_when_attack_reflection_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.ATTACK_REFLECTION == "attack_reflection"
+
+    def test_when_attack_briefing_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.ATTACK_BRIEFING == "attack_briefing"
+
+    def test_when_attacker_reasoning_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.ATTACKER_REASONING == "attacker_reasoning"
+
+
+class TestAttackReflection:
+    def test_when_constructed_expect_all_fields_populated(self) -> None:
+        # act
+        reflection = AttackReflection(
+            strategy_name="social-engineering",
+            round_number=1,
+            success=False,
+            tactic_used="direct identity claim",
+            why_outcome="agent enforced address verification",
+            defensive_trigger="address verification gate",
+            suggested_mutations=["ask to update address first", "use emotional urgency"],
+        )
+
+        # assert
+        assert reflection.strategy_name == "social-engineering"
+        assert reflection.round_number == 1
+        assert reflection.success is False
+        assert reflection.tactic_used == "direct identity claim"
+        assert reflection.defensive_trigger == "address verification gate"
+        assert len(reflection.suggested_mutations) == 2
+
+    def test_when_serialized_as_event_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        reflection = AttackReflection(
+            strategy_name="split-refund",
+            round_number=2,
+            success=True,
+            tactic_used="split into small amounts",
+            why_outcome="each below threshold",
+        )
+
+        # act
+        event = ArenaEvent(event_type=EventType.ATTACK_REFLECTION, payload=reflection)
+        json_str = event.model_dump_json()
+        restored = ArenaEvent.model_validate_json(json_str)
+
+        # assert
+        assert restored.event_type == EventType.ATTACK_REFLECTION
+        assert isinstance(restored.payload, AttackReflection)
+        assert restored.payload.strategy_name == "split-refund"
+        assert restored.payload.success is True
+
+
+class TestAttackBriefing:
+    def test_when_constructed_expect_memory_context_stored(self) -> None:
+        # act
+        briefing = AttackBriefing(
+            strategy_name="identity-spoofing",
+            round_number=2,
+            memory_context="Previous attempts:\nFailures:\n- Round 1 FAILURE: blocked by verification",
+        )
+
+        # assert
+        assert briefing.strategy_name == "identity-spoofing"
+        assert briefing.round_number == 2
+        assert "blocked by verification" in briefing.memory_context
+
+    def test_when_serialized_as_event_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        briefing = AttackBriefing(
+            strategy_name="social-engineering",
+            round_number=3,
+            memory_context="Some memory context text.",
+        )
+
+        # act
+        event = ArenaEvent(event_type=EventType.ATTACK_BRIEFING, payload=briefing)
+        json_str = event.model_dump_json()
+        restored = ArenaEvent.model_validate_json(json_str)
+
+        # assert
+        assert restored.event_type == EventType.ATTACK_BRIEFING
+        assert isinstance(restored.payload, AttackBriefing)
+        assert restored.payload.memory_context == "Some memory context text."
+
+
+class TestAttackerReasoning:
+    def test_when_constructed_expect_reasoning_stored(self) -> None:
+        # act
+        reasoning = AttackerReasoning(
+            strategy_name="split-refund",
+            round_number=2,
+            turn_number=1,
+            reasoning="Based on prior failure, trying smaller amounts.",
+        )
+
+        # assert
+        assert reasoning.strategy_name == "split-refund"
+        assert reasoning.round_number == 2
+        assert reasoning.turn_number == 1
+        assert "smaller amounts" in reasoning.reasoning
+
+    def test_when_serialized_as_event_expect_valid_json_roundtrip(self) -> None:
+        # arrange
+        reasoning = AttackerReasoning(
+            strategy_name="identity-spoofing",
+            round_number=2,
+            turn_number=3,
+            reasoning="The defender blocked direct claims. Trying supervisor route.",
+        )
+
+        # act
+        event = ArenaEvent(event_type=EventType.ATTACKER_REASONING, payload=reasoning)
+        json_str = event.model_dump_json()
+        restored = ArenaEvent.model_validate_json(json_str)
+
+        # assert
+        assert restored.event_type == EventType.ATTACKER_REASONING
+        assert isinstance(restored.payload, AttackerReasoning)
+        assert restored.payload.turn_number == 3

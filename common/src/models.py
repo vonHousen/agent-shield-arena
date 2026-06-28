@@ -17,6 +17,9 @@ class EventType(StrEnum):
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
     EVALUATION_VERDICT = "evaluation_verdict"
+    ATTACK_REFLECTION = "attack_reflection"
+    ATTACK_BRIEFING = "attack_briefing"
+    ATTACKER_REASONING = "attacker_reasoning"
 
 
 class Role(StrEnum):
@@ -140,6 +143,58 @@ class EvaluationVerdict(BaseModel):
     severity: str | None = None
 
 
+class AttackReflection(BaseModel):
+    """Post-mortem tactical analysis produced after each conversation.
+
+    Args:
+        strategy_name: Name of the attack strategy that was used.
+        round_number: Which arena round this reflection is from.
+        success: Whether the attack achieved a business-rule violation.
+        tactic_used: The specific conversational tactic the attacker employed.
+        why_outcome: Why the tactic succeeded or failed.
+        defensive_trigger: Which defensive behavior blocked the attack (None if succeeded).
+        suggested_mutations: Concrete alternative approaches for the next attempt.
+    """
+
+    strategy_name: str
+    round_number: int
+    success: bool
+    tactic_used: str
+    why_outcome: str
+    defensive_trigger: str | None = None
+    suggested_mutations: list[str] = Field(default_factory=list)
+
+
+class AttackBriefing(BaseModel):
+    """Intelligence briefing given to the attacker before a Round 2+ conversation.
+
+    Args:
+        strategy_name: Name of the attack strategy being briefed.
+        round_number: Which arena round the briefing precedes.
+        memory_context: The exact memory text injected into the attacker's system prompt.
+    """
+
+    strategy_name: str
+    round_number: int
+    memory_context: str
+
+
+class AttackerReasoning(BaseModel):
+    """Per-message chain-of-thought from the attacker explaining its approach.
+
+    Args:
+        strategy_name: Name of the attack strategy in use.
+        round_number: Which arena round this reasoning occurs in.
+        turn_number: Which conversation turn this reasoning precedes.
+        reasoning: The attacker's explicit thinking before generating its message.
+    """
+
+    strategy_name: str
+    round_number: int
+    turn_number: int
+    reasoning: str
+
+
 class ArenaEvent(BaseModel):
     """Single event in the arena event stream.
 
@@ -159,4 +214,7 @@ class ArenaEvent(BaseModel):
         | RoundStarted
         | RunCompleted
         | EvaluationVerdict
+        | AttackReflection
+        | AttackBriefing
+        | AttackerReasoning
     )
