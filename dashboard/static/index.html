@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AgentShield Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=4" />
+    <link rel="stylesheet" href="/static/styles.css?v=5" />
   </head>
   <body class="flex h-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
     <header class="shrink-0 border-b border-zinc-800 bg-zinc-950/95">
@@ -31,7 +31,7 @@
         <div class="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
           <div>
             <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Conversation</h2>
-            <p id="eventCount" class="text-sm text-zinc-500">0 events</p>
+            <p id="headerSummary" class="text-sm text-zinc-500">0 events</p>
           </div>
           <button
             id="scrollButton"
@@ -41,7 +41,7 @@
             Latest
           </button>
         </div>
-        <nav id="roundSelector" class="round-selector shrink-0 border-b border-zinc-800 px-4 py-2">
+        <nav id="roundSelector" class="round-selector shrink-0 border-b border-zinc-800 px-4">
           <button class="round-button active" type="button" data-round="all">All</button>
         </nav>
         <nav id="scenarioTabs" class="scenario-tabs shrink-0 border-b border-zinc-800 px-4">
@@ -75,7 +75,7 @@
               <p id="toolCallMetric" class="mt-1 text-2xl font-semibold tabular-nums">0</p>
             </div>
             <div>
-              <p class="text-zinc-500">Success Rate</p>
+              <p class="text-zinc-500">Defense Rate</p>
               <p id="successRateMetric" class="mt-1 text-2xl font-semibold tabular-nums">0%</p>
             </div>
           </div>
@@ -103,6 +103,6 @@
       </aside>
     </main>
 
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=5"></script>
   </body>
 </html>

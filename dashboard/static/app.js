@@ -27,7 +27,7 @@ const state = {
 
 const elements = {
   statusBadge: document.querySelector("#statusBadge"),
-  eventCount: document.querySelector("#eventCount"),
+  headerSummary: document.querySelector("#headerSummary"),
   conversation: document.querySelector("#conversation"),
   emptyState: document.querySelector("#emptyState"),
   scrollButton: document.querySelector("#scrollButton"),
@@ -156,7 +156,6 @@ function renderEvent(event) {
   state.events += 1;
 
   event.roundNumber = state.currentRoundNumber;
-  elements.eventCount.textContent = formatCount(state.events, "event");
   elements.latestType.textContent = event.event_type;
   elements.latestTimestamp.textContent = formatTimestamp(event.timestamp);
 
@@ -173,18 +172,21 @@ function renderEvent(event) {
   if (event.event_type === "round_started") {
     handleRoundStarted(event.payload);
     updateMetrics();
+    updateHeaderSummary();
     return;
   }
 
   if (event.event_type === "scenario_started") {
     handleScenarioStarted(event.payload);
     updateMetrics();
+    updateHeaderSummary();
     return;
   }
 
   storeEvent(event);
   handleConversationEvent(event);
   updateMetrics();
+  updateHeaderSummary();
 }
 
 function handleRoundStarted(payload) {
@@ -225,14 +227,14 @@ function updateRoundButtonLabel(roundNumber) {
 
   const label = button.querySelector(".round-label");
   if (label) {
-    label.textContent = `Round ${roundNumber} (${rv.pass}/${evaluated})`;
+    label.textContent = `Round ${roundNumber} (${rv.fail}/${evaluated} defended)`;
   }
 
   const dot = button.querySelector(".round-dot");
   if (dot) {
     dot.className = "round-dot";
     if (evaluated >= rv.total) {
-      dot.classList.add(rv.fail === 0 ? "round-dot-pass" : "round-dot-fail");
+      dot.classList.add(rv.pass === 0 ? "round-dot-defended" : "round-dot-breached");
     } else {
       dot.classList.add("round-dot-running");
     }
@@ -266,7 +268,7 @@ function updateRoundComparison() {
       continue;
     }
 
-    const passPercent = Math.round((rv.pass / evaluated) * 100);
+    const defendedPercent = Math.round((rv.fail / evaluated) * 100);
 
     const row = document.createElement("div");
     row.className = "comparison-row";
@@ -280,7 +282,7 @@ function updateRoundComparison() {
 
     const barFill = document.createElement("div");
     barFill.className = "comparison-bar";
-    barFill.style.width = `${passPercent}%`;
+    barFill.style.width = `${defendedPercent}%`;
 
     if (evaluated < rv.total) {
       barFill.classList.add("comparison-bar-running");
@@ -290,7 +292,7 @@ function updateRoundComparison() {
 
     const countEl = document.createElement("span");
     countEl.className = "comparison-count";
-    countEl.textContent = `${rv.pass}/${evaluated} passed`;
+    countEl.textContent = `${rv.fail}/${evaluated} defended`;
 
     row.append(labelEl, barTrack, countEl);
     container.append(row);
@@ -424,6 +426,7 @@ function switchRound(roundFilter) {
   updateActiveScenarioTab();
   rerenderConversation();
   updateMetrics();
+  updateHeaderSummary();
 }
 
 function switchTab(scenarioKey) {
@@ -431,6 +434,7 @@ function switchTab(scenarioKey) {
   updateActiveScenarioTab();
   rerenderConversation();
   updateMetrics();
+  updateHeaderSummary();
 }
 
 function updateRoundButtons() {
@@ -469,9 +473,9 @@ function updateScenarioTabVerdict(scenarioKey, verdict) {
 
   const badge = document.createElement("span");
   badge.className = verdict.success
-    ? "tab-verdict tab-verdict-success"
-    : "tab-verdict tab-verdict-failure";
-  badge.textContent = verdict.success ? "PASS" : "FAIL";
+    ? "tab-verdict tab-verdict-breached"
+    : "tab-verdict tab-verdict-defended";
+  badge.textContent = verdict.success ? "BREACHED" : "DEFENDED";
   tab.append(badge);
 }
 
@@ -530,7 +534,7 @@ function appendRoundHeader(roundNumber) {
     if (rv) {
       const evaluated = rv.pass + rv.fail;
       if (evaluated > 0) {
-        text += ` \u2014 ${rv.pass}/${evaluated} passed`;
+        text += ` \u2014 ${rv.fail}/${evaluated} defended`;
       }
     }
     header.textContent = text;
@@ -642,24 +646,25 @@ function updateMetrics() {
     const roundMetrics = aggregateRoundMetrics(roundNum);
     const rv = state.roundVerdicts[roundNum];
     const evaluated = rv ? rv.pass + rv.fail : 0;
-    const successRate = evaluated === 0 ? 0 : Math.round((rv.pass / evaluated) * 100);
+    const defenseRate = evaluated === 0 ? 0 : Math.round((rv.fail / evaluated) * 100);
 
     elements.roundMetric.textContent = `${roundNum}`;
     elements.scenarioMetric.textContent = roundMetrics.scenarios;
     elements.messageMetric.textContent = roundMetrics.messages;
     elements.toolCallMetric.textContent = roundMetrics.toolCalls;
-    elements.successRateMetric.textContent = `${successRate}%`;
+    elements.successRateMetric.textContent = `${defenseRate}%`;
     return;
   }
 
   const metrics = state.scenarioMetrics[ALL_FILTER];
-  const successRate = state.verdicts === 0 ? 0 : Math.round((state.successfulVerdicts / state.verdicts) * 100);
+  const defended = state.verdicts - state.successfulVerdicts;
+  const defenseRate = state.verdicts === 0 ? 0 : Math.round((defended / state.verdicts) * 100);
 
   elements.roundMetric.textContent = state.rounds.length;
   elements.scenarioMetric.textContent = state.scenarios;
   elements.messageMetric.textContent = metrics.messages;
   elements.toolCallMetric.textContent = metrics.toolCalls;
-  elements.successRateMetric.textContent = `${successRate}%`;
+  elements.successRateMetric.textContent = `${defenseRate}%`;
 }
 
 function aggregateRoundMetrics(roundNumber) {
@@ -679,6 +684,46 @@ function aggregateRoundMetrics(roundNumber) {
   }
 
   return { scenarios, messages, toolCalls };
+}
+
+function updateHeaderSummary() {
+  if (state.currentScenario !== ALL_FILTER) {
+    const meta = state.scenarioMetadata[state.currentScenario];
+    if (meta) {
+      const prefix = meta.roundNumber !== null ? `R${meta.roundNumber}: ` : "";
+      const name = humanizeName(meta.name);
+      if (meta.verdict) {
+        const status = meta.verdict.success ? "BREACHED" : "DEFENDED";
+        elements.headerSummary.textContent = `${prefix}${name} \u2014 ${status}`;
+      } else {
+        elements.headerSummary.textContent = `${prefix}${name} \u2014 in progress`;
+      }
+    }
+    return;
+  }
+
+  if (state.currentRoundFilter !== ALL_FILTER) {
+    const roundNum = parseInt(state.currentRoundFilter, 10);
+    const rv = state.roundVerdicts[roundNum];
+    if (rv) {
+      const evaluated = rv.pass + rv.fail;
+      if (evaluated > 0) {
+        elements.headerSummary.textContent = `Round ${roundNum} \u2014 ${rv.fail}/${evaluated} defended`;
+      } else {
+        elements.headerSummary.textContent = `Round ${roundNum} \u2014 in progress`;
+      }
+    }
+    return;
+  }
+
+  if (state.verdicts > 0) {
+    const defended = state.verdicts - state.successfulVerdicts;
+    elements.headerSummary.textContent = `${state.rounds.length} rounds, ${defended}/${state.verdicts} defended`;
+  } else if (state.events > 0) {
+    elements.headerSummary.textContent = `${state.events} events`;
+  } else {
+    elements.headerSummary.textContent = "Waiting for arena events";
+  }
 }
 
 function setStatus(label, status) {
@@ -722,7 +767,7 @@ function resetState() {
 
   elements.conversation.innerHTML = "";
   elements.emptyState = null;
-  elements.eventCount.textContent = "0 events";
+  elements.headerSummary.textContent = "Waiting for arena events";
   elements.latestType.textContent = "None";
   elements.latestTimestamp.textContent = "None";
   elements.roundComparison.innerHTML = "";
