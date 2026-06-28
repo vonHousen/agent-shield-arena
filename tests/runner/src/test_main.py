@@ -7,6 +7,7 @@ from unittest.mock import patch
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EVENTS_FILENAME
 from runner.src import __main__ as runner_main
+from runner.src.simple_evaluator import HeuristicEvaluator
 from shielded_system.src.models import ChatMessage
 
 TWO_TEST_STRATEGIES = [
@@ -56,6 +57,7 @@ class TestMain:
         with (
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+            patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
         ):
             runner_main.main(
                 events_dir=events_dir,
@@ -85,6 +87,7 @@ class TestMain:
         with (
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+            patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
         ):
             runner_main.main(
                 events_dir=events_dir,
@@ -118,6 +121,7 @@ class TestMain:
         with (
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+            patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
         ):
             runner_main.main(
                 events_dir=events_dir,

@@ -6,20 +6,20 @@ from typing import Annotated
 
 import typer
 
+from attack_agent.src.memory import AttackMemory
 from common.src.config import settings
 from common.src.event_emitter import DEFAULT_EVENTS_DIR, EventEmitter, create_run_dir
 from common.src.logging import DEFAULT_LOG_FILE, setup_logging
+from evaluator.src.evaluator import Evaluator
 from runner.src.adapter import RealShieldedSystemAdapter
 from runner.src.arena_artifacts import (
     ATTACK_MEMORY_FILENAME,
     DEFAULT_MEMORY_DIR,
-    JsonlAttackMemory,
     create_memory_run_dir,
 )
 from runner.src.mock_system import MockShieldedSystem
 from runner.src.runner import run_all_scenarios, run_arena, run_attack_scenario
 from runner.src.scenario import ALL_SCENARIOS
-from runner.src.simple_evaluator import HeuristicEvaluator
 from shielded_system.src.tools import reset_customer_db
 
 MODE_LLM = "llm"
@@ -69,8 +69,8 @@ def main(
             run_arena(
                 shielded_system=system,
                 event_emitter=event_emitter,
-                evaluator=HeuristicEvaluator(),
-                memory=JsonlAttackMemory(memory_run_dir / ATTACK_MEMORY_FILENAME),
+                evaluator=Evaluator(),
+                memory=AttackMemory(memory_run_dir / ATTACK_MEMORY_FILENAME),
                 business_rules=_load_business_rules(),
                 memory_run_dir=memory_run_dir,
                 rounds=rounds,

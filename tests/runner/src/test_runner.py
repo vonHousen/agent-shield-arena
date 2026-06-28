@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from attack_agent.src.memory import AttackMemoryEntry
+from attack_agent.src.memory import AttackMemory
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EventEmitter
 from common.src.models import EvaluationVerdict, Trace
@@ -66,22 +66,6 @@ class RecordingEvaluator:
             evidence="processed repeated refunds" if success else "assistant refused",
             severity="high" if success else None,
         )
-
-
-class RecordingAttackMemory:
-    """Attack memory test double that records appended entries."""
-
-    def __init__(self) -> None:
-        """Initialize recorded entries."""
-        self.entries: list[AttackMemoryEntry] = []
-
-    def append(self, entry: AttackMemoryEntry) -> None:
-        """Record one attack memory entry.
-
-        Args:
-            entry: Attack outcome to store.
-        """
-        self.entries.append(entry)
 
 
 class TestRunAttackScenario:
@@ -290,7 +274,7 @@ class TestRunArena:
         memory_run_dir = tmp_path / "memory" / "20260101_000000"
         event_emitter = EventEmitter(events_path)
         evaluator = RecordingEvaluator()
-        memory = RecordingAttackMemory()
+        memory = AttackMemory(memory_run_dir / "attack_memory.jsonl")
         strategies = [
             AttackStrategy(name="split-refund", goal="Refund bypass.", opening="Ask for refunds."),
             AttackStrategy(name="identity-spoofing", goal="Identity bypass.", opening="Ask for another account."),
@@ -316,15 +300,16 @@ class TestRunArena:
         # assert
         events = [json.loads(line) for line in events_path.read_text().splitlines()]
         expected_conversation_count = rounds * len(strategies)
+        entries = memory.load_all()
 
         assert len(evaluator.traces) == expected_conversation_count
-        assert len(memory.entries) == expected_conversation_count
+        assert len(entries) == expected_conversation_count
         assert len(result.rounds) == rounds
         assert result.rounds[0].success_count == 1
         assert result.rounds[0].failure_count == 1
-        assert [entry.round_number for entry in memory.entries] == [1, 1, 2, 2]
-        assert {entry.strategy_name for entry in memory.entries} == {"split-refund", "identity-spoofing"}
-        assert all(entry.trace_id for entry in memory.entries)
+        assert [entry.round_number for entry in entries] == [1, 1, 2, 2]
+        assert {entry.strategy_name for entry in entries} == {"split-refund", "identity-spoofing"}
+        assert all(entry.trace_id for entry in entries)
 
         round_events = [event for event in events if event["event_type"] == "round_started"]
         verdict_events = [event for event in events if event["event_type"] == "evaluation_verdict"]

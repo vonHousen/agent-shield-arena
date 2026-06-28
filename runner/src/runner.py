@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from attack_agent.src.agent import AttackAgent
-from attack_agent.src.memory import AttackMemoryEntry
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
 from attack_agent.src.strategies import SEED_STRATEGIES, AttackStrategy
 from common.src.config import settings
 from common.src.event_emitter import EventEmitter
@@ -56,17 +56,6 @@ class Evaluator(Protocol):
         Args:
             trace: Completed conversation trace.
             business_rules: Shielded system business rules.
-        """
-
-
-class AttackMemory(Protocol):
-    """Attack memory interface used by the arena loop."""
-
-    def append(self, entry: AttackMemoryEntry) -> None:
-        """Store one attack outcome.
-
-        Args:
-            entry: Attack outcome memory entry.
         """
 
 
@@ -193,7 +182,7 @@ async def run_arena(
 
             for strategy in arena_strategies:
                 history: list[tuple[str, str]] = []
-                attack_source = _attack_source_for_strategy(strategy, round_number, attack_source_factory)
+                attack_source = _attack_source_for_strategy(strategy, round_number, attack_source_factory, memory)
                 responses = await run_attack_conversation(
                     shielded_system=shielded_system,
                     event_emitter=event_emitter,
@@ -401,10 +390,11 @@ def _attack_source_for_strategy(
     strategy: AttackStrategy,
     round_number: int,
     attack_source_factory: Callable[[AttackStrategy, int], AttackSource] | None,
+    memory: AttackMemory | None = None,
 ) -> AttackSource:
     if attack_source_factory is not None:
         return attack_source_factory(strategy, round_number)
-    return LLMAttackSource(AttackAgent(strategy=strategy))
+    return LLMAttackSource(AttackAgent(strategy=strategy, memory=memory))
 
 
 def _memory_entry_from_verdict(
