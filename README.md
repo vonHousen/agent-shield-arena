@@ -4,6 +4,8 @@
 
 **Self-improving** guardrails system for any customer-facing AI agent. An **Attack Agent** probes the **Shielded System** as a black box to discover both universal LLM vulnerabilities and system-specific business-rule violations. A **Defender** learns generalized patterns from every successful attack. Each round produces better attacks *and* better defenses — the system gets stronger over time, not weaker. The adversarial loop runs in development (the **Arena**); the hardened Defender then ships as the Shielded System's runtime guardrails in production — it *is* the guardrails, not a layer on top of them.
 
+![Arena Architecture](docs/assets/arena-diagram.svg)
+
 ## Documentation
 
 Documentation is in the [docs](docs/) directory. The most important documents are:
@@ -13,10 +15,6 @@ Documentation is in the [docs](docs/) directory. The most important documents ar
 - [Architecture Diagrams](docs/assets/) - visual SVG diagrams of the Arena and production runtime
 
 ## Architecture
-
-![Arena Architecture](docs/assets/arena-diagram.svg)
-
-![Production Runtime](docs/assets/runtime-diagram.svg)
 
 ```text
 shielded_system/        # The agent being protected
