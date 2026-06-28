@@ -389,6 +389,11 @@ function handleConversationEvent(event) {
 
   if (event.event_type === "evaluation_verdict") {
     handleEvaluationVerdict(event);
+    return;
+  }
+
+  if (event.event_type === "content_filter") {
+    renderIfVisible(event, appendContentFilter);
   }
 }
 
@@ -552,6 +557,8 @@ function rerenderConversation() {
       appendToolResult(event.payload);
     } else if (event.event_type === "defender_decision") {
       appendDefenderDecision(event.payload);
+    } else if (event.event_type === "content_filter") {
+      appendContentFilter(event.payload);
     }
   }
 
@@ -962,6 +969,35 @@ function appendAttackerReasoning(payload) {
 
   bubble.append(label, text);
   row.append(bubble);
+  appendConversationNode(row);
+}
+
+function appendContentFilter(payload) {
+  const row = document.createElement("div");
+  row.className = "message-row message-row-center";
+
+  const banner = document.createElement("div");
+  banner.className = "content-filter-banner";
+
+  const header = document.createElement("div");
+  header.className = "content-filter-header";
+
+  const badge = document.createElement("span");
+  badge.className = "content-filter-badge";
+  badge.textContent = "CONTENT FILTERED";
+
+  const source = document.createElement("span");
+  source.className = "content-filter-source";
+  source.textContent = humanizeName(payload.source);
+
+  header.append(badge, source);
+
+  const msg = document.createElement("p");
+  msg.className = "content-filter-message";
+  msg.textContent = payload.message;
+
+  banner.append(header, msg);
+  row.append(banner);
   appendConversationNode(row);
 }
 

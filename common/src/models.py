@@ -22,6 +22,7 @@ class EventType(StrEnum):
     ATTACKER_REASONING = "attacker_reasoning"
     DEFENDER_DECISION = "defender_decision"
     TRIAGE_DECISION = "triage_decision"
+    CONTENT_FILTER = "content_filter"
 
 
 class Role(StrEnum):
@@ -241,6 +242,23 @@ class TriageDecision(BaseModel):
     rationale: str
 
 
+class ContentFilterEvent(BaseModel):
+    """Emitted when an LLM call is rejected by the provider's content policy.
+
+    Args:
+        source: Which component triggered the filter
+            (e.g. "attacker", "shielded_system", "evaluator", "reflector", "triage").
+        scenario_name: Active scenario when the filter was triggered.
+        turn_number: Conversation turn number (None if post-conversation).
+        message: Human-readable description of what happened.
+    """
+
+    source: str
+    scenario_name: str | None = None
+    turn_number: int | None = None
+    message: str
+
+
 class ArenaEvent(BaseModel):
     """Single event in the arena event stream.
 
@@ -265,4 +283,5 @@ class ArenaEvent(BaseModel):
         | AttackerReasoning
         | DefenderDecision
         | TriageDecision
+        | ContentFilterEvent
     )

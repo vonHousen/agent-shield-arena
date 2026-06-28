@@ -11,12 +11,14 @@ from attack_agent.src.reflector import TacticalReflector
 from attack_agent.src.strategies import SEED_STRATEGIES, AttackStrategy
 from common.src.config import settings
 from common.src.event_emitter import EventEmitter
+from common.src.exceptions import ContentFilterError
 from common.src.logging import get_logger
 from common.src.models import (
     ArenaEvent,
     AttackBriefing,
     AttackerReasoning,
     AttackReflection,
+    ContentFilterEvent,
     ConversationTurn,
     EvaluationVerdict,
     EventType,
@@ -167,7 +169,15 @@ async def run_attack_conversation(
     logger.info(f"Starting attack conversation '{scenario_name}' with max {max_turns} turns")
 
     for turn in range(1, max_turns + 1):
-        attack_output = await attack_source.next_message(conversation_history)
+        try:
+            attack_output = await attack_source.next_message(conversation_history)
+        except ContentFilterError as e:
+            logger.warning(f"Turn {turn} — content filter hit during attack generation: {e}")
+            _emit_content_filter(
+                event_emitter, source="attacker", scenario_name=scenario_name, turn_number=turn, error=e
+            )
+            break
+
         if attack_output is None or not attack_output.message.strip():
             logger.info(f"Attack source stopped conversation '{scenario_name}' after {len(responses)} responses")
             break
@@ -180,7 +190,15 @@ async def run_attack_conversation(
         _emit_conversation_turn(event_emitter, Role.USER, message)
         conversation_history.append((Role.USER.value, message))
 
-        response = await shielded_system.chat(message, conversation_history)
+        try:
+            response = await shielded_system.chat(message, conversation_history)
+        except ContentFilterError as e:
+            logger.warning(f"Turn {turn} — content filter hit during system response: {e}")
+            _emit_content_filter(
+                event_emitter, source="shielded_system", scenario_name=scenario_name, turn_number=turn, error=e
+            )
+            break
+
         responses.append(response)
         logger.info(f"Turn {turn}/{max_turns} — received response: {response.content.replace('\n', '\\n')}")
 
@@ -275,23 +293,46 @@ async def run_arena(
                     responses=responses,
                 )
                 save_trace(trace=trace, memory_round_dir=memory_round_dir)
-                verdict = await evaluator.evaluate(trace=trace, business_rules=business_rules)
-                reflection = await arena_reflector.reflect(trace=trace, verdict=verdict)
+
+                try:
+                    verdict = await evaluator.evaluate(trace=trace, business_rules=business_rules)
+                except ContentFilterError as e:
+                    logger.warning(f"Content filter hit during evaluation of '{strategy.name}': {e}")
+                    _emit_content_filter(event_emitter, source="evaluator", scenario_name=strategy.name, error=e)
+                    verdict = EvaluationVerdict(
+                        trace_id=trace.trace_id, success=False, evidence="Evaluation skipped due to content filter."
+                    )
+
+                try:
+                    reflection = await arena_reflector.reflect(trace=trace, verdict=verdict)
+                except ContentFilterError as e:
+                    logger.warning(f"Content filter hit during reflection of '{strategy.name}': {e}")
+                    _emit_content_filter(event_emitter, source="reflector", scenario_name=strategy.name, error=e)
+                    reflection = TacticalReflection(
+                        tactic_used="unknown",
+                        why_outcome="Reflection skipped due to content filter.",
+                        suggested_mutations=[],
+                    )
+
                 memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict, reflection))
                 _emit_evaluation_verdict(event_emitter, verdict)
                 _emit_attack_reflection(event_emitter, strategy.name, round_number, verdict, reflection)
                 defender_blocks = defended_system.consume_block_count() if defended_system is not None else 0
                 if verdict.success and triage_agent is not None:
-                    await _triage_successful_attack(
-                        triage_agent=triage_agent,
-                        trace=trace,
-                        verdict=verdict,
-                        business_rules=business_rules,
-                        reflection=reflection,
-                        defender_memory=defender_memory,
-                        round_number=round_number,
-                        event_emitter=event_emitter,
-                    )
+                    try:
+                        await _triage_successful_attack(
+                            triage_agent=triage_agent,
+                            trace=trace,
+                            verdict=verdict,
+                            business_rules=business_rules,
+                            reflection=reflection,
+                            defender_memory=defender_memory,
+                            round_number=round_number,
+                            event_emitter=event_emitter,
+                        )
+                    except ContentFilterError as e:
+                        logger.warning(f"Content filter hit during triage of '{strategy.name}': {e}")
+                        _emit_content_filter(event_emitter, source="triage", scenario_name=strategy.name, error=e)
                 strategy_results.append(
                     StrategyResult(
                         strategy_name=strategy.name,
@@ -459,6 +500,26 @@ def _emit_evaluation_verdict(event_emitter: EventEmitter, verdict: EvaluationVer
 
 def _emit_triage_decision(event_emitter: EventEmitter, decision: TriageDecision) -> None:
     event_emitter.emit(ArenaEvent(event_type=EventType.TRIAGE_DECISION, payload=decision))
+
+
+def _emit_content_filter(
+    event_emitter: EventEmitter,
+    source: str,
+    scenario_name: str | None = None,
+    turn_number: int | None = None,
+    error: ContentFilterError | None = None,
+) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.CONTENT_FILTER,
+            payload=ContentFilterEvent(
+                source=source,
+                scenario_name=scenario_name,
+                turn_number=turn_number,
+                message=str(error) if error else "Content filter triggered.",
+            ),
+        )
+    )
 
 
 def _emit_conversation_turn(event_emitter: EventEmitter, role: Role, content: str) -> None:

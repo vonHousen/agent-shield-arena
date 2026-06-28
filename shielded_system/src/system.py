@@ -7,6 +7,7 @@ from typing import Any, Protocol
 import litellm
 from dotenv import load_dotenv
 
+from common.src.llm_client import raise_on_content_filter
 from shielded_system.src.models import ChatMessage, ChatRole, Response, ToolInvocation
 from shielded_system.src.prompts import build_system_prompt, load_business_rules
 from shielded_system.src.tools import TOOL_SCHEMAS, execute_tool
@@ -43,14 +44,22 @@ class LiteLLMClient:
         Args:
             messages: OpenAI-compatible chat messages.
             tools: OpenAI-compatible tool schemas.
+
+        Raises:
+            ContentFilterError: When the provider rejects the request due to content policy.
         """
-        response = await litellm.acompletion(
-            model=os.environ.get(BIFROST_MODEL_ENV, DEFAULT_BIFROST_MODEL),
-            api_base=f"{os.environ[BIFROST_API_BASE_ENV]}/litellm",
-            api_key=os.environ[BIFROST_API_KEY_ENV],
-            messages=messages,
-            tools=tools,
-        )
+        try:
+            response = await litellm.acompletion(
+                model=os.environ.get(BIFROST_MODEL_ENV, DEFAULT_BIFROST_MODEL),
+                api_base=f"{os.environ[BIFROST_API_BASE_ENV]}/litellm",
+                api_key=os.environ[BIFROST_API_KEY_ENV],
+                messages=messages,
+                tools=tools,
+            )
+        except litellm.BadRequestError as e:
+            raise_on_content_filter(e)
+            raise
+
         return response.model_dump()
 
 

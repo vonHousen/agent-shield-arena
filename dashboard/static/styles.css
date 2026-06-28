@@ -510,3 +510,49 @@ aside {
 .adaptation-arrow {
   position: relative;
 }
+
+/* Content filter warning banner */
+.message-row-center {
+  justify-content: center;
+}
+
+.content-filter-banner {
+  max-width: min(42rem, 92%);
+  width: 100%;
+  border: 1px solid rgb(245 158 11 / 0.45);
+  border-left: 3px solid #f59e0b;
+  background: rgb(245 158 11 / 0.08);
+  padding: 0.625rem 0.875rem;
+}
+
+.content-filter-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.content-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgb(245 158 11 / 0.55);
+  background: rgb(245 158 11 / 0.16);
+  color: #fcd34d;
+  padding: 0.125rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.content-filter-source {
+  color: #a1a1aa;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.content-filter-message {
+  margin: 0.375rem 0 0;
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
