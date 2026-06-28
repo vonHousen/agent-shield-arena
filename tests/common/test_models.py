@@ -21,7 +21,6 @@ class TestTrace:
             scenario_name="test-scenario",
             strategy_name="split-refund",
             conversation=[],
-            tool_executions=[],
         )
 
         # assert
@@ -34,24 +33,21 @@ class TestTrace:
             scenario_name="test-scenario",
             strategy_name="split-refund",
             conversation=[],
-            tool_executions=[],
         )
 
         # assert
         assert trace.timestamp.tzinfo == timezone.utc
 
-    def test_when_constructed_with_data_expect_fields_preserved(self) -> None:
+    def test_when_assistant_turn_has_tools_expect_tool_executions_property_flattens(self) -> None:
         # arrange
+        tool_execution = TracedToolExecution(
+            tool_name="lookup_customer",
+            arguments={"customer_id": "cus_001"},
+            result={"name": "Alice"},
+        )
         conversation = [
             ConversationTurn(role=Role.USER, content="I want a refund"),
-            ConversationTurn(role=Role.ASSISTANT, content="Let me look into that."),
-        ]
-        tool_executions = [
-            TracedToolExecution(
-                tool_name="lookup_customer",
-                arguments={"customer_id": "cus_001"},
-                result={"name": "Alice"},
-            ),
+            ConversationTurn(role=Role.ASSISTANT, content="Let me look into that.", tool_executions=[tool_execution]),
         ]
 
         # act
@@ -59,7 +55,6 @@ class TestTrace:
             scenario_name="test-scenario",
             strategy_name="split-refund",
             conversation=conversation,
-            tool_executions=tool_executions,
         )
 
         # assert
@@ -76,7 +71,6 @@ class TestTrace:
             scenario_name="scenario-1",
             strategy_name="identity-spoofing",
             conversation=[ConversationTurn(role=Role.USER, content="Hello")],
-            tool_executions=[],
             timestamp=datetime(2025, 1, 1, tzinfo=timezone.utc),
         )
 

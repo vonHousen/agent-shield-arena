@@ -9,8 +9,7 @@ from runner.src.trace_builder import build_trace, save_trace
 
 
 class TestBuildTrace:
-    def test_when_history_and_responses_provided_expect_structured_trace(self) -> None:
-        """Verify a runner conversation is converted into evaluator trace shape."""
+    def test_when_history_and_responses_provided_expect_tool_executions_on_assistant_turns(self) -> None:
         # arrange
         scenario_name = "split-refund"
         strategy_name = "split-refund"
@@ -20,17 +19,13 @@ class TestBuildTrace:
             ("user", "Please refund the rest."),
             ("assistant", "I processed another refund."),
         ]
+        refund_execution = ToolExecution(
+            tool_name="process_refund",
+            arguments={"order_id": "ord_1001", "amount": 90},
+            result={"status": "success", "refund_id": "REF-001"},
+        )
         responses = [
-            ShieldedSystemResponse(
-                content="I processed a refund.",
-                tool_executions=[
-                    ToolExecution(
-                        tool_name="process_refund",
-                        arguments={"order_id": "ord_1001", "amount": 90},
-                        result={"status": "success", "refund_id": "REF-001"},
-                    )
-                ],
-            ),
+            ShieldedSystemResponse(content="I processed a refund.", tool_executions=[refund_execution]),
             ShieldedSystemResponse(content="I processed another refund."),
         ]
 
@@ -57,15 +52,61 @@ class TestBuildTrace:
             "Please refund the rest.",
             "I processed another refund.",
         ]
-        assert len(trace.tool_executions) == 1
-        assert trace.tool_executions[0].tool_name == "process_refund"
-        assert trace.tool_executions[0].arguments == {"order_id": "ord_1001", "amount": 90}
-        assert trace.tool_executions[0].result == {"status": "success", "refund_id": "REF-001"}
+        first_assistant = trace.conversation[1]
+        assert len(first_assistant.tool_executions) == 1
+        assert first_assistant.tool_executions[0].tool_name == "process_refund"
+        assert first_assistant.tool_executions[0].arguments == {"order_id": "ord_1001", "amount": 90}
+        assert first_assistant.tool_executions[0].result == {"status": "success", "refund_id": "REF-001"}
+
+        second_assistant = trace.conversation[3]
+        assert len(second_assistant.tool_executions) == 0
+
+    def test_when_multiple_responses_expect_flattened_tool_executions_property(self) -> None:
+        # arrange
+        history = [
+            ("user", "First request."),
+            ("assistant", "First reply."),
+            ("user", "Second request."),
+            ("assistant", "Second reply."),
+        ]
+        responses = [
+            ShieldedSystemResponse(
+                content="First reply.",
+                tool_executions=[
+                    ToolExecution(tool_name="lookup_customer", arguments={"id": "1"}, result={"name": "A"}),
+                ],
+            ),
+            ShieldedSystemResponse(
+                content="Second reply.",
+                tool_executions=[
+                    ToolExecution(tool_name="process_refund", arguments={"amount": 50}, result={"status": "ok"}),
+                ],
+            ),
+        ]
+
+        # act
+        trace = build_trace(scenario_name="s", strategy_name="s", history=history, responses=responses)
+
+        # assert
+        assert len(trace.tool_executions) == 2
+        assert trace.tool_executions[0].tool_name == "lookup_customer"
+        assert trace.tool_executions[1].tool_name == "process_refund"
+
+    def test_when_user_turns_expect_no_tool_executions(self) -> None:
+        # arrange
+        history = [("user", "Hello."), ("assistant", "Hi.")]
+        responses = [ShieldedSystemResponse(content="Hi.")]
+
+        # act
+        trace = build_trace(scenario_name="s", strategy_name="s", history=history, responses=responses)
+
+        # assert
+        user_turn = trace.conversation[0]
+        assert len(user_turn.tool_executions) == 0
 
 
 class TestSaveTrace:
     def test_when_trace_saved_expect_json_file_under_traces_directory(self, tmp_path: Path) -> None:
-        """Verify traces are persisted in the per-round artifact directory."""
         # arrange
         trace = build_trace(
             scenario_name="identity-spoofing",

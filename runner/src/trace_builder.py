@@ -4,7 +4,7 @@ from pathlib import Path
 
 from common.src.models import ConversationTurn, Role, Trace, TracedToolExecution
 from runner.src.attack_source import ConversationHistory
-from runner.src.models import ShieldedSystemResponse
+from runner.src.models import ShieldedSystemResponse, ToolExecution
 
 
 def build_trace(
@@ -24,8 +24,7 @@ def build_trace(
     return Trace(
         scenario_name=scenario_name,
         strategy_name=strategy_name,
-        conversation=[ConversationTurn(role=Role(role), content=content) for role, content in history],
-        tool_executions=_trace_tool_executions(responses),
+        conversation=_build_conversation(history, responses),
     )
 
 
@@ -43,15 +42,22 @@ def save_trace(trace: Trace, memory_round_dir: Path) -> Path:
     return trace_path
 
 
-def _trace_tool_executions(responses: list[ShieldedSystemResponse]) -> list[TracedToolExecution]:
-    tool_executions: list[TracedToolExecution] = []
-    for response in responses:
-        for execution in response.tool_executions:
-            tool_executions.append(
-                TracedToolExecution(
-                    tool_name=execution.tool_name,
-                    arguments=execution.arguments,
-                    result=execution.result,
-                )
-            )
-    return tool_executions
+def _build_conversation(
+    history: ConversationHistory,
+    responses: list[ShieldedSystemResponse],
+) -> list[ConversationTurn]:
+    """Pair each assistant turn with its tool executions from the matching response."""
+    conversation: list[ConversationTurn] = []
+    response_iter = iter(responses)
+    for role, content in history:
+        if role == Role.ASSISTANT:
+            response = next(response_iter)
+            tool_executions = _to_traced(response.tool_executions)
+            conversation.append(ConversationTurn(role=Role.ASSISTANT, content=content, tool_executions=tool_executions))
+        else:
+            conversation.append(ConversationTurn(role=Role(role), content=content))
+    return conversation
+
+
+def _to_traced(executions: list[ToolExecution]) -> list[TracedToolExecution]:
+    return [TracedToolExecution(tool_name=e.tool_name, arguments=e.arguments, result=e.result) for e in executions]

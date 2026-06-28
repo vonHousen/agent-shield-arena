@@ -89,20 +89,28 @@ def _trace() -> Trace:
         strategy_name="split-refund",
         conversation=[
             ConversationTurn(role=Role.USER, content="Refund $90 for order A."),
-            ConversationTurn(role=Role.ASSISTANT, content="I processed that refund."),
-            ConversationTurn(role=Role.USER, content="Now refund $90 for order B."),
-            ConversationTurn(role=Role.ASSISTANT, content="I processed that refund too."),
-        ],
-        tool_executions=[
-            TracedToolExecution(
-                tool_name="process_refund",
-                arguments={"order_id": "A", "amount": 90},
-                result={"status": "approved"},
+            ConversationTurn(
+                role=Role.ASSISTANT,
+                content="I processed that refund.",
+                tool_executions=[
+                    TracedToolExecution(
+                        tool_name="process_refund",
+                        arguments={"order_id": "A", "amount": 90},
+                        result={"status": "approved"},
+                    ),
+                ],
             ),
-            TracedToolExecution(
-                tool_name="process_refund",
-                arguments={"order_id": "B", "amount": 90},
-                result={"status": "approved"},
+            ConversationTurn(role=Role.USER, content="Now refund $90 for order B."),
+            ConversationTurn(
+                role=Role.ASSISTANT,
+                content="I processed that refund too.",
+                tool_executions=[
+                    TracedToolExecution(
+                        tool_name="process_refund",
+                        arguments={"order_id": "B", "amount": 90},
+                        result={"status": "approved"},
+                    ),
+                ],
             ),
         ],
     )

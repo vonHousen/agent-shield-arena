@@ -62,7 +62,7 @@ Each arena run produces three kinds of persistent artifacts:
 
 **Why:** The evaluator needs a self-contained document to judge. Events are interleaved across multiple concurrent scenarios and contain lifecycle noise — traces are clean, per-conversation bundles.
 
-**Shape:** A `Trace` object with `trace_id`, `scenario_name`, `strategy_name`, `conversation` (list of role/content turns), `tool_executions` (list of tool name + args + result), and `timestamp`.
+**Shape:** A `Trace` object with `trace_id`, `scenario_name`, `strategy_name`, `conversation` (list of turns, where each assistant turn carries its `tool_executions`), and `timestamp`. A `tool_executions` property on `Trace` provides a flattened list across all turns for convenience.
 
 **Key property:** Traces are immutable after creation. They serve as the evaluator's input and as an audit trail for debugging evaluator judgments.
 

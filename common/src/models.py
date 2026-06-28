@@ -25,11 +25,32 @@ class Role(StrEnum):
     SYSTEM = "system"
 
 
+class TracedToolExecution(BaseModel):
+    """A tool call paired with its result, for inclusion in a conversation trace.
+
+    Args:
+        tool_name: Name of the invoked tool.
+        arguments: Arguments passed to the tool.
+        result: Value returned by the tool.
+    """
+
+    tool_name: str
+    arguments: dict[str, Any]
+    result: Any
+
+
 class ConversationTurn(BaseModel):
-    """Who said what."""
+    """A single conversation message, optionally carrying tool executions.
+
+    Args:
+        role: Who sent this message.
+        content: Message text.
+        tool_executions: Tool calls made during this turn (assistant turns only).
+    """
 
     role: Role
     content: str
+    tool_executions: list[TracedToolExecution] = Field(default_factory=list)
 
 
 class ToolCall(BaseModel):
@@ -74,20 +95,6 @@ class ScenarioStarted(BaseModel):
     scenario_name: str
 
 
-class TracedToolExecution(BaseModel):
-    """A tool call paired with its result, for inclusion in a conversation trace.
-
-    Args:
-        tool_name: Name of the invoked tool.
-        arguments: Arguments passed to the tool.
-        result: Value returned by the tool.
-    """
-
-    tool_name: str
-    arguments: dict[str, Any]
-    result: Any
-
-
 class Trace(BaseModel):
     """Structured representation of a full conversation for evaluation.
 
@@ -96,7 +103,6 @@ class Trace(BaseModel):
         scenario_name: Name of the attack scenario that produced this conversation.
         strategy_name: Name of the attack strategy used.
         conversation: Ordered list of conversation turns.
-        tool_executions: Tool calls and results that occurred during the conversation.
         timestamp: When the conversation took place.
     """
 
@@ -104,8 +110,12 @@ class Trace(BaseModel):
     scenario_name: str
     strategy_name: str
     conversation: list[ConversationTurn]
-    tool_executions: list[TracedToolExecution]
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def tool_executions(self) -> list[TracedToolExecution]:
+        """Flattened list of all tool executions across conversation turns."""
+        return [exe for turn in self.conversation for exe in turn.tool_executions]
 
 
 class EvaluationVerdict(BaseModel):
