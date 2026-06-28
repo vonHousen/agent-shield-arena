@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     runner_max_turns: int = Field(default=12, description="Runner hard ceiling (safety net, > attack budget)")
     runner_turn_delay_seconds: float = Field(default=0.0, description="Pause between turns for demo pacing")
 
+    arena_rounds: int = Field(default=3, description="Number of arena rounds in a multi-round session")
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

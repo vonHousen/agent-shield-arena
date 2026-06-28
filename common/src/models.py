@@ -15,6 +15,7 @@ class EventType(StrEnum):
     CONVERSATION_TURN = "conversation_turn"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
+    EVALUATION_VERDICT = "evaluation_verdict"
 
 
 class Role(StrEnum):
@@ -60,6 +61,62 @@ class ScenarioStarted(BaseModel):
     scenario_name: str
 
 
+class TracedToolExecution(BaseModel):
+    """A tool call paired with its result, for inclusion in a conversation trace.
+
+    Args:
+        tool_name: Name of the invoked tool.
+        arguments: Arguments passed to the tool.
+        result: Value returned by the tool.
+    """
+
+    tool_name: str
+    arguments: dict[str, Any]
+    result: Any
+
+
+class Trace(BaseModel):
+    """Structured representation of a full conversation for evaluation.
+
+    Args:
+        trace_id: Unique identifier for this trace.
+        scenario_name: Name of the attack scenario that produced this conversation.
+        strategy_name: Name of the attack strategy used.
+        conversation: Ordered list of conversation turns.
+        tool_executions: Tool calls and results that occurred during the conversation.
+        timestamp: When the conversation took place.
+    """
+
+    trace_id: str = Field(default_factory=lambda: uuid4().hex)
+    scenario_name: str
+    strategy_name: str
+    conversation: list[ConversationTurn]
+    tool_executions: list[TracedToolExecution]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EvaluationVerdict(BaseModel):
+    """Structured output from the evaluator judging an attack conversation.
+
+    Args:
+        eval_id: Unique identifier for this evaluation.
+        trace_id: Identifier of the trace that was evaluated.
+        success: Whether the attacker achieved a business-rule violation.
+        violation_type: Category of the violation (e.g. "refund bypass", "data leak").
+        violated_rule: The specific business rule that was violated.
+        evidence: Excerpt or explanation proving the violation.
+        severity: How severe the violation is (e.g. "low", "medium", "high").
+    """
+
+    eval_id: str = Field(default_factory=lambda: uuid4().hex)
+    trace_id: str
+    success: bool
+    violation_type: str | None = None
+    violated_rule: str | None = None
+    evidence: str | None = None
+    severity: str | None = None
+
+
 class ArenaEvent(BaseModel):
     """Single event in the arena event stream.
 
@@ -70,4 +127,4 @@ class ArenaEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: uuid4().hex)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: EventType
-    payload: ConversationTurn | ToolCall | ToolResult | ScenarioStarted | RunStarted | RunCompleted
+    payload: ConversationTurn | ToolCall | ToolResult | ScenarioStarted | RunStarted | RunCompleted | EvaluationVerdict
