@@ -3,6 +3,8 @@ const state = {
   currentScenario: "all",
   activeScenarioName: null,
   scenarioEvents: { all: [] },
+
+  scenarios: 0,
   scenarioMetrics: {
     all: { messages: 0, toolCalls: 0, toolResults: 0 },
   },
@@ -15,9 +17,9 @@ const elements = {
   emptyState: document.querySelector("#emptyState"),
   scrollButton: document.querySelector("#scrollButton"),
   scenarioTabs: document.querySelector("#scenarioTabs"),
+  scenarioMetric: document.querySelector("#scenarioMetric"),
   messageMetric: document.querySelector("#messageMetric"),
   toolCallMetric: document.querySelector("#toolCallMetric"),
-  toolResultMetric: document.querySelector("#toolResultMetric"),
   latestType: document.querySelector("#latestType"),
   latestTimestamp: document.querySelector("#latestTimestamp"),
 };
@@ -101,6 +103,7 @@ function renderEvent(event) {
 function handleScenarioStarted(payload) {
   const name = payload.scenario_name;
   state.activeScenarioName = name;
+  state.scenarios += 1;
   state.scenarioEvents[name] = [];
   state.scenarioMetrics[name] = { messages: 0, toolCalls: 0, toolResults: 0 };
 
@@ -247,10 +250,10 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
-  const metrics = state.scenarioMetrics[state.currentScenario] || state.scenarioMetrics.all;
+  const metrics = state.scenarioMetrics.all;
+  elements.scenarioMetric.textContent = state.scenarios;
   elements.messageMetric.textContent = metrics.messages;
   elements.toolCallMetric.textContent = metrics.toolCalls;
-  elements.toolResultMetric.textContent = metrics.toolResults;
 }
 
 function setStatus(label, status) {
@@ -267,6 +270,7 @@ function setStatus(label, status) {
 
 function resetState() {
   state.events = 0;
+  state.scenarios = 0;
   state.currentScenario = "all";
   state.activeScenarioName = null;
   state.scenarioEvents = { all: [] };
