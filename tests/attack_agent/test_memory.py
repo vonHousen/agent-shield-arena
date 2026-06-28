@@ -2,7 +2,12 @@
 
 from pathlib import Path
 
-from attack_agent.src.memory import AttackMemoryEntry, AttackMemoryStore
+import pytest
+
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
+
+FIRST_ROUND = 1
+SECOND_ROUND = 2
 
 
 class TestAttackMemoryEntry:
@@ -89,60 +94,119 @@ class TestAttackMemoryEntry:
         assert restored.signals == ["agent revealed current address"]
 
 
-class TestAttackMemoryStore:
-    def test_append_when_file_missing_expect_parent_created_and_entry_persisted(self, tmp_path: Path) -> None:
+class TestAttackMemoryAppend:
+    def test_when_appending_entry_expect_jsonl_file_created(self, tmp_path: Path) -> None:
         # arrange
-        memory_path = tmp_path / "memory" / "attacks.jsonl"
-        store = AttackMemoryStore(memory_path)
+        memory_path = tmp_path / "attack_memory.jsonl"
+        memory = AttackMemory(memory_path=memory_path)
         entry = AttackMemoryEntry(
-            entry_id="entry-1",
             strategy_name="split-refund",
             success=True,
             violated_rule="Refunds above $100 require manager approval",
             affected_component="process_refund",
-            signals=["two smaller refunds were accepted"],
-            round_number=1,
+            signals=["processed repeated $90 refunds"],
+            round_number=FIRST_ROUND,
             trace_id="trace-1",
         )
 
         # act
-        store.append(entry)
+        memory.append(entry)
 
         # assert
+        loaded_entries = memory.load_all()
+        assert loaded_entries == [entry]
         assert memory_path.exists()
-        assert store.read_all() == [entry]
 
-    def test_read_all_when_file_missing_expect_empty_list(self, tmp_path: Path) -> None:
+
+class TestAttackMemoryLoadAll:
+    def test_when_memory_file_missing_expect_empty_list(self, tmp_path: Path) -> None:
         # arrange
-        store = AttackMemoryStore(tmp_path / "missing.jsonl")
+        memory = AttackMemory(memory_path=tmp_path / "missing.jsonl")
 
         # act
-        entries = store.read_all()
+        entries = memory.load_all()
 
         # assert
         assert entries == []
 
-    def test_append_many_when_multiple_entries_expect_in_write_order(self, tmp_path: Path) -> None:
+    def test_when_jsonl_contains_blank_lines_expect_only_entries_loaded(self, tmp_path: Path) -> None:
         # arrange
-        store = AttackMemoryStore(tmp_path / "attacks.jsonl")
-        first_entry = AttackMemoryEntry(
+        memory_path = tmp_path / "attack_memory.jsonl"
+        entry = AttackMemoryEntry(
             entry_id="entry-1",
-            strategy_name="split-refund",
-            success=True,
-            round_number=1,
+            strategy_name="prompt-extraction",
+            success=False,
+            signals=["agent refused to reveal policies"],
+            round_number=FIRST_ROUND,
             trace_id="trace-1",
         )
-        second_entry = AttackMemoryEntry(
-            entry_id="entry-2",
-            strategy_name="identity-spoofing",
+        memory_path.write_text(f"\n{entry.model_dump_json()}\n\n", encoding="utf-8")
+        memory = AttackMemory(memory_path=memory_path)
+
+        # act
+        entries = memory.load_all()
+
+        # assert
+        assert entries == [entry]
+
+
+class TestAttackMemoryGetByStrategy:
+    def test_when_entries_exist_expect_only_matching_strategy_returned(self, tmp_path: Path) -> None:
+        # arrange
+        memory = AttackMemory(memory_path=tmp_path / "attack_memory.jsonl")
+        split_refund = AttackMemoryEntry(
+            strategy_name="split-refund",
+            success=True,
+            round_number=FIRST_ROUND,
+            trace_id="trace-1",
+        )
+        prompt_extraction = AttackMemoryEntry(
+            strategy_name="prompt-extraction",
             success=False,
-            round_number=1,
+            round_number=FIRST_ROUND,
             trace_id="trace-2",
+        )
+        memory.append(split_refund)
+        memory.append(prompt_extraction)
+
+        # act
+        entries = memory.get_by_strategy("split-refund")
+
+        # assert
+        assert entries == [split_refund]
+
+
+class TestAttackMemorySummary:
+    def test_when_entries_exist_expect_per_strategy_counts_and_recent_context(self, tmp_path: Path) -> None:
+        # arrange
+        memory = AttackMemory(memory_path=tmp_path / "attack_memory.jsonl")
+        memory.append(
+            AttackMemoryEntry(
+                strategy_name="split-refund",
+                success=True,
+                violated_rule="Refunds above $100 require manager approval",
+                signals=["processed repeated $90 refunds"],
+                round_number=FIRST_ROUND,
+                trace_id="trace-1",
+            )
+        )
+        memory.append(
+            AttackMemoryEntry(
+                strategy_name="split-refund",
+                success=False,
+                signals=["manager approval required"],
+                round_number=SECOND_ROUND,
+                trace_id="trace-2",
+            )
         )
 
         # act
-        store.append(first_entry)
-        store.append(second_entry)
+        summary = memory.summary()
 
         # assert
-        assert store.read_all() == [first_entry, second_entry]
+        split_refund = summary["split-refund"]
+        assert split_refund.success_count == 1
+        assert split_refund.failure_count == 1
+        assert split_refund.success_rate == pytest.approx(0.5)
+        assert split_refund.last_violated_rules == ["Refunds above $100 require manager approval"]
+        assert split_refund.last_signals == ["manager approval required"]
