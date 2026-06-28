@@ -52,10 +52,6 @@ class RunStarted(BaseModel):
     scenario_count: int
 
 
-class RunCompleted(BaseModel):
-    """Marks the end of an arena run."""
-
-
 class RoundStarted(BaseModel):
     """Marks the beginning of an arena round.
 
@@ -66,6 +62,10 @@ class RoundStarted(BaseModel):
 
     round_number: int
     strategy_count: int
+
+
+class RunCompleted(BaseModel):
+    """Marks the end of an arena run."""
 
 
 class ScenarioStarted(BaseModel):
@@ -146,7 +146,7 @@ class ArenaEvent(BaseModel):
         | ToolResult
         | ScenarioStarted
         | RunStarted
-        | RunCompleted
         | RoundStarted
+        | RunCompleted
         | EvaluationVerdict
     )

@@ -167,12 +167,11 @@ class TestArenaEventWithEvaluationVerdict:
 
 class TestArenaEventWithRoundStarted:
     def test_when_round_started_payload_expect_valid_event(self) -> None:
-        """Verify round lifecycle events can be emitted to the dashboard stream."""
         # arrange
-        round_started = RoundStarted(round_number=2, strategy_count=4)
+        payload = RoundStarted(round_number=2, strategy_count=4)
 
         # act
-        event = ArenaEvent(event_type=EventType.ROUND_STARTED, payload=round_started)
+        event = ArenaEvent(event_type=EventType.ROUND_STARTED, payload=payload)
 
         # assert
         assert event.event_type == EventType.ROUND_STARTED
