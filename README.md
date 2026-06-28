@@ -51,14 +51,15 @@ Pass `--verbose` for DEBUG-level output or `--log-file <path>` to override the d
 
 ## Quick Start
 
+Use `just` as task runner (use `just --list` to list all recipes).
+
+### Prepare prerequisites
+
 ```bash
 cp .env.example .env   # add your API keys
 uv sync
 just pre-commit-install
-just <recipe>
 ```
-
-Use `just` as task runner (use `just --list` to list all recipes).
 
 ### Run the Arena
 
