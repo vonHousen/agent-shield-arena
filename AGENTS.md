@@ -53,6 +53,7 @@ Runs lint, validation, and tests in sequence — same checks as the GitLab CI pi
 - avoid using getattr() / setattr() etc. - use direct attribute access instead, as it is safer and easier to maintain;
 - do not overuse `type: ignore` — fix the underlying type issue instead. Only use it when the type checker is genuinely wrong and there's no reasonable way to satisfy it; when used, always add a comment explaining why the ignore is necessary;
 - when implementing any python script to be used using CLI, use `typer`;
+- when parsing any response from LLM, use `pydantic` models to parse the response into a structured object;
 
 ### Commit messages
 
