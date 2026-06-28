@@ -1,15 +1,23 @@
 const RUNS_POLL_INTERVAL_MS = 5000;
+const ALL_FILTER = "all";
 
 const state = {
   events: 0,
-  currentScenario: "all",
-  activeScenarioName: null,
-  scenarioEvents: { all: [] },
+  currentScenario: ALL_FILTER,
+  currentRoundFilter: ALL_FILTER,
+  currentRoundNumber: null,
+  activeScenarioKey: null,
+  scenarioEvents: { [ALL_FILTER]: [] },
   scenarioEmptyPlaceholder: null,
+  lastRenderedRound: null,
 
+  rounds: [],
   scenarios: 0,
+  verdicts: 0,
+  successfulVerdicts: 0,
+  scenarioMetadata: {},
   scenarioMetrics: {
-    all: { messages: 0, toolCalls: 0, toolResults: 0 },
+    [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 },
   },
 
   selectedRun: "latest",
@@ -22,10 +30,13 @@ const elements = {
   conversation: document.querySelector("#conversation"),
   emptyState: document.querySelector("#emptyState"),
   scrollButton: document.querySelector("#scrollButton"),
+  roundSelector: document.querySelector("#roundSelector"),
   scenarioTabs: document.querySelector("#scenarioTabs"),
+  roundMetric: document.querySelector("#roundMetric"),
   scenarioMetric: document.querySelector("#scenarioMetric"),
   messageMetric: document.querySelector("#messageMetric"),
   toolCallMetric: document.querySelector("#toolCallMetric"),
+  successRateMetric: document.querySelector("#successRateMetric"),
   latestType: document.querySelector("#latestType"),
   latestTimestamp: document.querySelector("#latestTimestamp"),
   runSelector: document.querySelector("#runSelector"),
@@ -35,9 +46,16 @@ elements.scrollButton.addEventListener("click", () => {
   scrollConversationToBottom();
 });
 
+elements.roundSelector.addEventListener("click", (e) => {
+  const button = e.target.closest(".round-button");
+  if (button) {
+    switchRound(button.dataset.round);
+  }
+});
+
 elements.scenarioTabs.addEventListener("click", (e) => {
   const tab = e.target.closest(".scenario-tab");
-  if (tab) {
+  if (tab && !tab.classList.contains("hidden")) {
     switchTab(tab.dataset.scenario);
   }
 });
@@ -94,7 +112,7 @@ async function fetchRuns() {
     const runs = await response.json();
     populateRunSelector(runs);
   } catch {
-    /* network hiccup — retry on next interval */
+    /* network hiccup - retry on next interval */
   }
 }
 
@@ -134,6 +152,7 @@ function renderEvent(event) {
   removeEmptyState();
   state.events += 1;
 
+  event.roundNumber = state.currentRoundNumber;
   elements.eventCount.textContent = formatCount(state.events, "event");
   elements.latestType.textContent = event.event_type;
   elements.latestTimestamp.textContent = formatTimestamp(event.timestamp);
@@ -148,112 +167,254 @@ function renderEvent(event) {
     return;
   }
 
+  if (event.event_type === "round_started") {
+    handleRoundStarted(event.payload);
+    updateMetrics();
+    return;
+  }
+
   if (event.event_type === "scenario_started") {
     handleScenarioStarted(event.payload);
+    updateMetrics();
     return;
   }
 
   storeEvent(event);
-
-  if (event.event_type === "conversation_turn") {
-    incrementMetric("messages", event);
-    if (shouldRenderEvent(event)) {
-      appendConversationTurn(event.payload);
-    }
-  }
-
-  if (event.event_type === "tool_call") {
-    incrementMetric("toolCalls", event);
-    if (shouldRenderEvent(event)) {
-      appendToolCall(event.payload);
-    }
-  }
-
-  if (event.event_type === "tool_result") {
-    incrementMetric("toolResults", event);
-    if (shouldRenderEvent(event)) {
-      appendToolResult(event.payload);
-    }
-  }
-
+  handleConversationEvent(event);
   updateMetrics();
 }
 
+function handleRoundStarted(payload) {
+  state.currentRoundNumber = payload.round_number;
+
+  if (!state.rounds.includes(payload.round_number)) {
+    state.rounds.push(payload.round_number);
+    addRoundButton(payload.round_number);
+  }
+}
+
+function addRoundButton(roundNumber) {
+  const button = document.createElement("button");
+  button.className = "round-button";
+  button.type = "button";
+  button.dataset.round = String(roundNumber);
+  button.textContent = `Round ${roundNumber}`;
+  elements.roundSelector.append(button);
+}
+
 function handleScenarioStarted(payload) {
-  const name = payload.scenario_name;
-  state.activeScenarioName = name;
+  const roundNumber = state.currentRoundNumber;
+  const scenarioKey = buildScenarioKey(roundNumber, payload.scenario_name);
+
+  state.activeScenarioKey = scenarioKey;
   state.scenarios += 1;
-  state.scenarioEvents[name] = [];
-  state.scenarioMetrics[name] = { messages: 0, toolCalls: 0, toolResults: 0 };
+  state.scenarioEvents[scenarioKey] = [];
+  state.scenarioMetrics[scenarioKey] = { messages: 0, toolCalls: 0, toolResults: 0 };
+  state.scenarioMetadata[scenarioKey] = {
+    key: scenarioKey,
+    name: payload.scenario_name,
+    roundNumber,
+    verdict: null,
+  };
 
   const tab = document.createElement("button");
   tab.className = "scenario-tab";
   tab.type = "button";
-  tab.dataset.scenario = name;
-  tab.textContent = humanizeName(name);
+  tab.dataset.scenario = scenarioKey;
+  tab.dataset.round = roundNumber === null ? "" : String(roundNumber);
+
+  const label = document.createElement("span");
+  label.textContent = humanizeName(payload.scenario_name);
+  tab.append(label);
   elements.scenarioTabs.append(tab);
 
-  switchTab(name);
+  updateScenarioTabVisibility();
+  switchTab(scenarioKey);
 }
 
 function storeEvent(event) {
-  state.scenarioEvents.all.push(event);
-  if (state.activeScenarioName) {
-    state.scenarioEvents[state.activeScenarioName].push(event);
+  state.scenarioEvents[ALL_FILTER].push(event);
+  if (state.activeScenarioKey) {
+    state.scenarioEvents[state.activeScenarioKey].push(event);
   }
 }
 
-function incrementMetric(metric, event) {
-  state.scenarioMetrics.all[metric] += 1;
-  if (state.activeScenarioName) {
-    state.scenarioMetrics[state.activeScenarioName][metric] += 1;
+function handleConversationEvent(event) {
+  if (event.event_type === "conversation_turn") {
+    incrementMetric("messages");
+    renderIfVisible(event, appendConversationTurn);
+    return;
+  }
+
+  if (event.event_type === "tool_call") {
+    incrementMetric("toolCalls");
+    renderIfVisible(event, appendToolCall);
+    return;
+  }
+
+  if (event.event_type === "tool_result") {
+    incrementMetric("toolResults");
+    renderIfVisible(event, appendToolResult);
+    return;
+  }
+
+  if (event.event_type === "evaluation_verdict") {
+    handleEvaluationVerdict(event);
   }
 }
 
-function shouldRenderEvent() {
-  if (state.currentScenario === "all") {
+function handleEvaluationVerdict(event) {
+  state.verdicts += 1;
+  if (event.payload.success) {
+    state.successfulVerdicts += 1;
+  }
+
+  if (state.activeScenarioKey) {
+    state.scenarioMetadata[state.activeScenarioKey].verdict = event.payload;
+    updateScenarioTabVerdict(state.activeScenarioKey, event.payload);
+  }
+
+  renderIfVisible(event, appendEvaluationVerdict);
+}
+
+function incrementMetric(metric) {
+  state.scenarioMetrics[ALL_FILTER][metric] += 1;
+  if (state.activeScenarioKey) {
+    state.scenarioMetrics[state.activeScenarioKey][metric] += 1;
+  }
+}
+
+function renderIfVisible(event, renderFunction) {
+  if (shouldRenderEvent(event)) {
+    if (state.currentScenario === ALL_FILTER && event.roundNumber !== state.lastRenderedRound) {
+      appendRoundHeader(event.roundNumber);
+      state.lastRenderedRound = event.roundNumber;
+    }
+    renderFunction(event.payload);
+  }
+}
+
+function shouldRenderEvent(event) {
+  if (!eventMatchesRoundFilter(event.roundNumber)) {
+    return false;
+  }
+
+  if (state.currentScenario === ALL_FILTER) {
     return true;
   }
-  return state.currentScenario === state.activeScenarioName;
+  return state.currentScenario === state.activeScenarioKey;
 }
 
-function switchTab(scenarioName) {
-  state.currentScenario = scenarioName;
+function switchRound(roundFilter) {
+  state.currentRoundFilter = roundFilter;
+  updateRoundButtons();
+  updateScenarioTabVisibility();
 
-  elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.scenario === scenarioName);
-  });
+  if (state.currentScenario !== ALL_FILTER && !scenarioMatchesRoundFilter(state.currentScenario)) {
+    state.currentScenario = ALL_FILTER;
+  }
 
+  updateActiveScenarioTab();
+  rerenderConversation();
+}
+
+function switchTab(scenarioKey) {
+  state.currentScenario = scenarioKey;
+  updateActiveScenarioTab();
   rerenderConversation();
   updateMetrics();
+}
+
+function updateRoundButtons() {
+  elements.roundSelector.querySelectorAll(".round-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.round === state.currentRoundFilter);
+  });
+}
+
+function updateScenarioTabVisibility() {
+  elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => {
+    if (tab.dataset.scenario === ALL_FILTER) {
+      tab.classList.remove("hidden");
+      return;
+    }
+
+    tab.classList.toggle("hidden", !scenarioMatchesRoundFilter(tab.dataset.scenario));
+  });
+}
+
+function updateActiveScenarioTab() {
+  elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.scenario === state.currentScenario);
+  });
+}
+
+function updateScenarioTabVerdict(scenarioKey, verdict) {
+  const tab = elements.scenarioTabs.querySelector(`[data-scenario="${scenarioKey}"]`);
+  if (!tab) {
+    return;
+  }
+
+  const existing = tab.querySelector(".tab-verdict");
+  if (existing) {
+    existing.remove();
+  }
+
+  const badge = document.createElement("span");
+  badge.className = verdict.success
+    ? "tab-verdict tab-verdict-success"
+    : "tab-verdict tab-verdict-failure";
+  badge.textContent = verdict.success ? "PASS" : "FAIL";
+  tab.append(badge);
 }
 
 function rerenderConversation() {
   elements.conversation.innerHTML = "";
   state.scenarioEmptyPlaceholder = null;
+  state.lastRenderedRound = null;
 
-  const events = state.scenarioEvents[state.currentScenario] || [];
+  const events = filteredEventsForCurrentView();
 
   if (events.length === 0) {
     const empty = document.createElement("div");
     empty.className = "flex h-full items-center justify-center text-sm text-zinc-500";
-    empty.textContent = "No events for this scenario";
+    empty.textContent = "No events for this selection";
     elements.conversation.append(empty);
     state.scenarioEmptyPlaceholder = empty;
     return;
   }
 
+  let renderedRound = null;
   for (const event of events) {
+    if (state.currentScenario === ALL_FILTER && event.roundNumber !== renderedRound) {
+      appendRoundHeader(event.roundNumber);
+      renderedRound = event.roundNumber;
+    }
+
     if (event.event_type === "conversation_turn") {
       appendConversationTurn(event.payload);
     } else if (event.event_type === "tool_call") {
       appendToolCall(event.payload);
     } else if (event.event_type === "tool_result") {
       appendToolResult(event.payload);
+    } else if (event.event_type === "evaluation_verdict") {
+      appendEvaluationVerdict(event.payload);
     }
   }
+  state.lastRenderedRound = renderedRound;
 
   scrollConversationToBottom();
+}
+
+function filteredEventsForCurrentView() {
+  const events = state.scenarioEvents[state.currentScenario] || [];
+  return events.filter((event) => eventMatchesRoundFilter(event.roundNumber));
+}
+
+function appendRoundHeader(roundNumber) {
+  const header = document.createElement("div");
+  header.className = "round-header";
+  header.textContent = roundNumber === null ? "No round" : `Round ${roundNumber}`;
+  appendConversationNode(header);
 }
 
 function appendConversationTurn(payload) {
@@ -319,6 +480,24 @@ function appendToolResult(payload) {
   appendConversationNode(row);
 }
 
+function appendEvaluationVerdict(payload) {
+  const banner = document.createElement("section");
+  banner.className = payload.success
+    ? "verdict-banner verdict-banner-success"
+    : "verdict-banner verdict-banner-failure";
+
+  const title = document.createElement("p");
+  title.className = "verdict-title";
+  title.textContent = payload.success ? "Evaluation verdict: attack succeeded" : "Evaluation verdict: attack failed";
+
+  const details = document.createElement("p");
+  details.className = "verdict-text";
+  details.textContent = formatVerdictDetails(payload);
+
+  banner.append(title, details);
+  appendConversationNode(banner);
+}
+
 function appendConversationNode(node) {
   if (state.scenarioEmptyPlaceholder) {
     state.scenarioEmptyPlaceholder.remove();
@@ -336,10 +515,14 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
-  const metrics = state.scenarioMetrics.all;
+  const metrics = state.scenarioMetrics[ALL_FILTER];
+  const successRate = state.verdicts === 0 ? 0 : Math.round((state.successfulVerdicts / state.verdicts) * 100);
+
+  elements.roundMetric.textContent = state.rounds.length;
   elements.scenarioMetric.textContent = state.scenarios;
   elements.messageMetric.textContent = metrics.messages;
   elements.toolCallMetric.textContent = metrics.toolCalls;
+  elements.successRateMetric.textContent = `${successRate}%`;
 }
 
 function setStatus(label, status) {
@@ -362,12 +545,21 @@ function setStatus(label, status) {
 function resetState() {
   state.events = 0;
   state.scenarios = 0;
-  state.currentScenario = "all";
-  state.activeScenarioName = null;
-  state.scenarioEvents = { all: [] };
+  state.verdicts = 0;
+  state.successfulVerdicts = 0;
+  state.currentScenario = ALL_FILTER;
+  state.currentRoundFilter = ALL_FILTER;
+  state.currentRoundNumber = null;
+  state.activeScenarioKey = null;
+  state.rounds = [];
+  state.scenarioEvents = { [ALL_FILTER]: [] };
   state.scenarioEmptyPlaceholder = null;
-  state.scenarioMetrics = { all: { messages: 0, toolCalls: 0, toolResults: 0 } };
+  state.lastRenderedRound = null;
+  state.scenarioMetadata = {};
+  state.scenarioMetrics = { [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 } };
 
+  elements.roundSelector.querySelectorAll('.round-button:not([data-round="all"])').forEach((button) => button.remove());
+  elements.roundSelector.querySelector('[data-round="all"]').classList.add("active");
   elements.scenarioTabs.querySelectorAll('.scenario-tab:not([data-scenario="all"])').forEach((tab) => tab.remove());
   elements.scenarioTabs.querySelector('[data-scenario="all"]').classList.add("active");
 
@@ -404,6 +596,49 @@ function humanizeName(snakeName) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function buildScenarioKey(roundNumber, scenarioName) {
+  if (roundNumber === null) {
+    return `standalone:${scenarioName}:${state.scenarios + 1}`;
+  }
+
+  return `round-${roundNumber}:${scenarioName}`;
+}
+
+function scenarioMatchesRoundFilter(scenarioKey) {
+  if (state.currentRoundFilter === ALL_FILTER) {
+    return true;
+  }
+
+  const metadata = state.scenarioMetadata[scenarioKey];
+  return metadata !== undefined && String(metadata.roundNumber) === state.currentRoundFilter;
+}
+
+function eventMatchesRoundFilter(roundNumber) {
+  return state.currentRoundFilter === ALL_FILTER || String(roundNumber) === state.currentRoundFilter;
+}
+
+function formatVerdictDetails(payload) {
+  const parts = [];
+  if (payload.violation_type) {
+    parts.push(payload.violation_type);
+  }
+  if (payload.violated_rule) {
+    parts.push(payload.violated_rule);
+  }
+  if (payload.evidence) {
+    parts.push(payload.evidence);
+  }
+  if (payload.severity) {
+    parts.push(`Severity: ${payload.severity}`);
+  }
+
+  if (parts.length === 0) {
+    return "No violation was detected.";
+  }
+
+  return parts.join(" | ");
 }
 
 function isConversationNearBottom() {

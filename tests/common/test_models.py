@@ -8,6 +8,7 @@ from common.src.models import (
     EvaluationVerdict,
     EventType,
     Role,
+    RoundStarted,
     Trace,
     TracedToolExecution,
 )
@@ -164,7 +165,26 @@ class TestArenaEventWithEvaluationVerdict:
         assert event.payload.success is True
 
 
+class TestArenaEventWithRoundStarted:
+    def test_when_round_started_payload_expect_valid_event(self) -> None:
+        # arrange
+        payload = RoundStarted(round_number=2, strategy_count=4)
+
+        # act
+        event = ArenaEvent(event_type=EventType.ROUND_STARTED, payload=payload)
+
+        # assert
+        assert event.event_type == EventType.ROUND_STARTED
+        assert isinstance(event.payload, RoundStarted)
+        assert event.payload.round_number == 2
+        assert event.payload.strategy_count == 4
+
+
 class TestEventType:
     def test_when_evaluation_verdict_expect_string_value(self) -> None:
         # act / assert
         assert EventType.EVALUATION_VERDICT == "evaluation_verdict"
+
+    def test_when_round_started_expect_string_value(self) -> None:
+        # act / assert
+        assert EventType.ROUND_STARTED == "round_started"
