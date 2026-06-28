@@ -2,7 +2,7 @@
 
 ## Project's context
 
-All the necessary context can be found in the [docs](docs/) directory. Among others: 
+All the necessary context can be found in the [docs](docs/) directory. Among others:
 
 - short project context in [project-brief.md](docs/project-brief.md),
 - the design doc with a high-level specification in [design.md](docs/03-design.md).

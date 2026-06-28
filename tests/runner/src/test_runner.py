@@ -10,19 +10,22 @@ from runner.src.scenario import get_split_refund_bypass_scenario
 
 class TestRunAttackScenario:
     async def test_when_split_refund_scenario_runs_expect_events_for_each_turn_and_tool_call(self, tmp_path) -> None:
-        """Verify the runner emits user, tool, and assistant events."""
+        """Verify the runner emits scenario_started, user, tool, and assistant events."""
         # arrange
         events_path = tmp_path / "events.jsonl"
         event_emitter = EventEmitter(events_path)
         messages = get_split_refund_bypass_scenario()
-        expected_events_per_turn = 4
-        expected_event_count = len(messages) * expected_events_per_turn
+        scenario_name = "test_scenario"
+        events_per_turn = 4
+        scenario_started_event_count = 1
+        expected_event_count = scenario_started_event_count + len(messages) * events_per_turn
 
         # act
         responses = await run_attack_scenario(
             shielded_system=MockShieldedSystem(),
             event_emitter=event_emitter,
             messages=messages,
+            scenario_name=scenario_name,
             turn_delay_seconds=0,
         )
 
@@ -32,15 +35,17 @@ class TestRunAttackScenario:
 
         assert len(responses) == len(messages)
         assert len(events) == expected_event_count
-        assert events[0]["event_type"] == "conversation_turn"
-        assert events[0]["payload"]["role"] == "user"
-        assert events[0]["payload"]["content"] == messages[0]
-        assert events[1]["event_type"] == "tool_call"
-        assert events[1]["payload"]["tool_name"] == "process_refund"
-        assert events[2]["event_type"] == "tool_result"
-        assert events[2]["payload"]["result"]["status"] == "success"
-        assert events[3]["event_type"] == "conversation_turn"
-        assert events[3]["payload"]["role"] == "assistant"
+        assert events[0]["event_type"] == "scenario_started"
+        assert events[0]["payload"]["scenario_name"] == scenario_name
+        assert events[1]["event_type"] == "conversation_turn"
+        assert events[1]["payload"]["role"] == "user"
+        assert events[1]["payload"]["content"] == messages[0]
+        assert events[2]["event_type"] == "tool_call"
+        assert events[2]["payload"]["tool_name"] == "process_refund"
+        assert events[3]["event_type"] == "tool_result"
+        assert events[3]["payload"]["result"]["status"] == "success"
+        assert events[4]["event_type"] == "conversation_turn"
+        assert events[4]["payload"]["role"] == "assistant"
 
     async def test_when_scenario_runs_expect_mock_system_receives_conversation_history(self, tmp_path) -> None:
         """Verify conversation history is built as the runner advances turns."""
@@ -55,6 +60,7 @@ class TestRunAttackScenario:
             shielded_system=MockShieldedSystem(),
             event_emitter=event_emitter,
             messages=messages,
+            scenario_name="test_scenario",
             turn_delay_seconds=0,
         )
 

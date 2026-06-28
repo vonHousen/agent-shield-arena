@@ -84,3 +84,33 @@ aside {
   color: #d4d4d8;
   font-size: 0.8125rem;
 }
+
+.scenario-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scenario-tab {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #a1a1aa;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.scenario-tab:hover {
+  color: #e4e4e7;
+  background: rgb(63 63 70 / 0.3);
+}
+
+.scenario-tab.active {
+  color: #6ee7b7;
+  border-bottom-color: #6ee7b7;
+}

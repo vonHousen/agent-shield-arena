@@ -21,6 +21,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff",
+    "pre-commit",
 ]
 
 [tool.pytest.ini_options]

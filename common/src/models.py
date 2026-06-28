@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class EventType(StrEnum):
+    SCENARIO_STARTED = "scenario_started"
     CONVERSATION_TURN = "conversation_turn"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
@@ -41,6 +42,12 @@ class ToolResult(BaseModel):
     result: Any
 
 
+class ScenarioStarted(BaseModel):
+    """Marks the beginning of a new attack scenario."""
+
+    scenario_name: str
+
+
 class ArenaEvent(BaseModel):
     """Single event in the arena event stream.
 
@@ -51,4 +58,4 @@ class ArenaEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: uuid4().hex)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: EventType
-    payload: ConversationTurn | ToolCall | ToolResult
+    payload: ConversationTurn | ToolCall | ToolResult | ScenarioStarted

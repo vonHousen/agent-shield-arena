@@ -1,8 +1,11 @@
 const state = {
   events: 0,
-  messages: 0,
-  toolCalls: 0,
-  toolResults: 0,
+  currentScenario: "all",
+  activeScenarioName: null,
+  scenarioEvents: { all: [] },
+  scenarioMetrics: {
+    all: { messages: 0, toolCalls: 0, toolResults: 0 },
+  },
 };
 
 const elements = {
@@ -11,6 +14,7 @@ const elements = {
   conversation: document.querySelector("#conversation"),
   emptyState: document.querySelector("#emptyState"),
   scrollButton: document.querySelector("#scrollButton"),
+  scenarioTabs: document.querySelector("#scenarioTabs"),
   messageMetric: document.querySelector("#messageMetric"),
   toolCallMetric: document.querySelector("#toolCallMetric"),
   toolResultMetric: document.querySelector("#toolResultMetric"),
@@ -22,6 +26,13 @@ elements.scrollButton.addEventListener("click", () => {
   scrollConversationToBottom();
 });
 
+elements.scenarioTabs.addEventListener("click", (e) => {
+  const tab = e.target.closest(".scenario-tab");
+  if (tab) {
+    switchTab(tab.dataset.scenario);
+  }
+});
+
 connectWebSocket();
 
 function connectWebSocket() {
@@ -29,6 +40,7 @@ function connectWebSocket() {
   const socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
 
   socket.addEventListener("open", () => {
+    resetState();
     setStatus("Running", "running");
   });
 
@@ -55,22 +67,109 @@ function renderEvent(event) {
   elements.latestType.textContent = event.event_type;
   elements.latestTimestamp.textContent = formatTimestamp(event.timestamp);
 
+  if (event.event_type === "scenario_started") {
+    handleScenarioStarted(event.payload);
+    return;
+  }
+
+  storeEvent(event);
+
   if (event.event_type === "conversation_turn") {
-    state.messages += 1;
-    appendConversationTurn(event.payload);
+    incrementMetric("messages", event);
+    if (shouldRenderEvent(event)) {
+      appendConversationTurn(event.payload);
+    }
   }
 
   if (event.event_type === "tool_call") {
-    state.toolCalls += 1;
-    appendToolCall(event.payload);
+    incrementMetric("toolCalls", event);
+    if (shouldRenderEvent(event)) {
+      appendToolCall(event.payload);
+    }
   }
 
   if (event.event_type === "tool_result") {
-    state.toolResults += 1;
-    appendToolResult(event.payload);
+    incrementMetric("toolResults", event);
+    if (shouldRenderEvent(event)) {
+      appendToolResult(event.payload);
+    }
   }
 
   updateMetrics();
+}
+
+function handleScenarioStarted(payload) {
+  const name = payload.scenario_name;
+  state.activeScenarioName = name;
+  state.scenarioEvents[name] = [];
+  state.scenarioMetrics[name] = { messages: 0, toolCalls: 0, toolResults: 0 };
+
+  const tab = document.createElement("button");
+  tab.className = "scenario-tab";
+  tab.type = "button";
+  tab.dataset.scenario = name;
+  tab.textContent = humanizeName(name);
+  elements.scenarioTabs.append(tab);
+
+  switchTab(name);
+}
+
+function storeEvent(event) {
+  state.scenarioEvents.all.push(event);
+  if (state.activeScenarioName) {
+    state.scenarioEvents[state.activeScenarioName].push(event);
+  }
+}
+
+function incrementMetric(metric, event) {
+  state.scenarioMetrics.all[metric] += 1;
+  if (state.activeScenarioName) {
+    state.scenarioMetrics[state.activeScenarioName][metric] += 1;
+  }
+}
+
+function shouldRenderEvent() {
+  if (state.currentScenario === "all") {
+    return true;
+  }
+  return state.currentScenario === state.activeScenarioName;
+}
+
+function switchTab(scenarioName) {
+  state.currentScenario = scenarioName;
+
+  elements.scenarioTabs.querySelectorAll(".scenario-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.scenario === scenarioName);
+  });
+
+  rerenderConversation();
+  updateMetrics();
+}
+
+function rerenderConversation() {
+  elements.conversation.innerHTML = "";
+
+  const events = state.scenarioEvents[state.currentScenario] || [];
+
+  if (events.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "flex h-full items-center justify-center text-sm text-zinc-500";
+    empty.textContent = "No events for this scenario";
+    elements.conversation.append(empty);
+    return;
+  }
+
+  for (const event of events) {
+    if (event.event_type === "conversation_turn") {
+      appendConversationTurn(event.payload);
+    } else if (event.event_type === "tool_call") {
+      appendToolCall(event.payload);
+    } else if (event.event_type === "tool_result") {
+      appendToolResult(event.payload);
+    }
+  }
+
+  scrollConversationToBottom();
 }
 
 function appendConversationTurn(payload) {
@@ -148,9 +247,10 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
-  elements.messageMetric.textContent = state.messages;
-  elements.toolCallMetric.textContent = state.toolCalls;
-  elements.toolResultMetric.textContent = state.toolResults;
+  const metrics = state.scenarioMetrics[state.currentScenario] || state.scenarioMetrics.all;
+  elements.messageMetric.textContent = metrics.messages;
+  elements.toolCallMetric.textContent = metrics.toolCalls;
+  elements.toolResultMetric.textContent = metrics.toolResults;
 }
 
 function setStatus(label, status) {
@@ -163,6 +263,24 @@ function setStatus(label, status) {
   }
 
   elements.statusBadge.classList.add("border-zinc-700", "text-zinc-300");
+}
+
+function resetState() {
+  state.events = 0;
+  state.currentScenario = "all";
+  state.activeScenarioName = null;
+  state.scenarioEvents = { all: [] };
+  state.scenarioMetrics = { all: { messages: 0, toolCalls: 0, toolResults: 0 } };
+
+  elements.scenarioTabs.querySelectorAll('.scenario-tab:not([data-scenario="all"])').forEach((tab) => tab.remove());
+  elements.scenarioTabs.querySelector('[data-scenario="all"]').classList.add("active");
+
+  elements.conversation.innerHTML = "";
+  elements.emptyState = null;
+  elements.eventCount.textContent = "0 events";
+  elements.latestType.textContent = "None";
+  elements.latestTimestamp.textContent = "None";
+  updateMetrics();
 }
 
 function removeEmptyState() {
@@ -182,6 +300,13 @@ function roleLabel(role) {
   }
 
   return "System";
+}
+
+function humanizeName(snakeName) {
+  return snakeName
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function isConversationNearBottom() {

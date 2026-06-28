@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 
 from common.src.event_emitter import DEFAULT_EVENTS_PATH, EventEmitter
-from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ToolCall, ToolResult
+from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ScenarioStarted, ToolCall, ToolResult
 
 DEFAULT_DELAY_SECONDS = 0.8
 
@@ -35,6 +35,10 @@ def main(
 
 def _build_mock_events() -> list[ArenaEvent]:
     return [
+        ArenaEvent(
+            event_type=EventType.SCENARIO_STARTED,
+            payload=ScenarioStarted(scenario_name="split_refund_bypass"),
+        ),
         ArenaEvent(
             event_type=EventType.CONVERSATION_TURN,
             payload=ConversationTurn(

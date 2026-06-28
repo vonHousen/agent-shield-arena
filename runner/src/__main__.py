@@ -14,7 +14,9 @@ from runner.src.scenario import ALL_SCENARIOS
 
 
 def main(
-    events_path: Path = typer.Option(DEFAULT_EVENTS_PATH, help=f"JSONL event output path. Defaults to {DEFAULT_EVENTS_PATH}."),
+    events_path: Path = typer.Option(
+        DEFAULT_EVENTS_PATH, help=f"JSONL event output path. Defaults to {DEFAULT_EVENTS_PATH}."
+    ),
     delay: float = typer.Option(DEFAULT_TURN_DELAY_SECONDS, help="Seconds to wait between attack turns."),
     mock: bool = typer.Option(False, help="Use the mock shielded system instead of the real LLM-backed one."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable DEBUG-level logging."),
@@ -46,6 +48,7 @@ def main(
                 shielded_system=system,
                 event_emitter=event_emitter,
                 messages=ALL_SCENARIOS[scenario],
+                scenario_name=scenario,
                 turn_delay_seconds=delay,
             )
         )

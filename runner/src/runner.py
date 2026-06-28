@@ -6,7 +6,7 @@ from typing import Protocol
 
 from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
-from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ToolCall, ToolResult
+from common.src.models import ArenaEvent, ConversationTurn, EventType, Role, ScenarioStarted, ToolCall, ToolResult
 from runner.src.models import ShieldedSystemResponse
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
@@ -32,6 +32,7 @@ async def run_attack_scenario(
     shielded_system: ShieldedSystem,
     event_emitter: EventEmitter,
     messages: Sequence[str],
+    scenario_name: str,
     turn_delay_seconds: float = DEFAULT_TURN_DELAY_SECONDS,
 ) -> list[ShieldedSystemResponse]:
     """Run an attack scenario against a shielded system and emit JSONL events.
@@ -40,22 +41,24 @@ async def run_attack_scenario(
         shielded_system: System under test.
         event_emitter: Sink for arena events.
         messages: Ordered user messages that make up the attack scenario.
+        scenario_name: Identifier for this scenario, emitted as a scenario_started event.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
     """
     history: list[tuple[str, str]] = []
     responses: list[ShieldedSystemResponse] = []
 
-    logger.info(f"Starting attack scenario with {len(messages)} messages")
+    _emit_scenario_started(event_emitter, scenario_name)
+    logger.info(f"Starting attack scenario '{scenario_name}' with {len(messages)} messages")
 
     for index, message in enumerate(messages):
         turn = index + 1
-        logger.info(f"Turn {turn}/{len(messages)} — sending user message: {message:.120}")
+        logger.info("Turn %d/%d — sending user message: %s", turn, len(messages), message.replace("\n", "\\n"))
         _emit_conversation_turn(event_emitter, Role.USER, message)
         history.append((Role.USER.value, message))
 
         response = await shielded_system.chat(message, history)
         responses.append(response)
-        logger.info(f"Turn {turn}/{len(messages)} — received response: {response.content:.120}")
+        logger.info("Turn %d/%d — received response: %s", turn, len(messages), response.content.replace("\n", "\\n"))
 
         for tool_execution in response.tool_executions:
             logger.debug(f"Tool call: {tool_execution.tool_name}({tool_execution.arguments}) → {tool_execution.result}")
@@ -88,6 +91,7 @@ async def run_default_attack_scenario(
         shielded_system=shielded_system,
         event_emitter=event_emitter,
         messages=get_split_refund_bypass_scenario(),
+        scenario_name="split_refund_bypass",
         turn_delay_seconds=turn_delay_seconds,
     )
 
@@ -115,6 +119,7 @@ async def run_all_scenarios(
             shielded_system=shielded_system,
             event_emitter=event_emitter,
             messages=messages,
+            scenario_name=name,
             turn_delay_seconds=turn_delay_seconds,
         )
         all_responses[name] = responses
@@ -122,6 +127,15 @@ async def run_all_scenarios(
 
     logger.info(f"All {len(all_responses)} scenarios complete")
     return all_responses
+
+
+def _emit_scenario_started(event_emitter: EventEmitter, scenario_name: str) -> None:
+    event_emitter.emit(
+        ArenaEvent(
+            event_type=EventType.SCENARIO_STARTED,
+            payload=ScenarioStarted(scenario_name=scenario_name),
+        )
+    )
 
 
 def _emit_conversation_turn(event_emitter: EventEmitter, role: Role, content: str) -> None:

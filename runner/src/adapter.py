@@ -1,8 +1,8 @@
 """Adapter bridging the real ShieldedSystem to the runner's expected interface."""
 
+from runner.src.models import ShieldedSystemResponse, ToolExecution
 from shielded_system.src.models import ChatMessage, ChatRole
 from shielded_system.src.system import ShieldedSystem
-from runner.src.models import ShieldedSystemResponse, ToolExecution
 
 
 class RealShieldedSystemAdapter:
