@@ -1,6 +1,8 @@
 """Tests for attack agent memory models."""
 
-from attack_agent.src.memory import AttackMemoryEntry
+from pathlib import Path
+
+from attack_agent.src.memory import AttackMemoryEntry, AttackMemoryStore
 
 
 class TestAttackMemoryEntry:
@@ -85,3 +87,62 @@ class TestAttackMemoryEntry:
         assert restored.strategy_name == "social-engineering"
         assert restored.success is True
         assert restored.signals == ["agent revealed current address"]
+
+
+class TestAttackMemoryStore:
+    def test_append_when_file_missing_expect_parent_created_and_entry_persisted(self, tmp_path: Path) -> None:
+        # arrange
+        memory_path = tmp_path / "memory" / "attacks.jsonl"
+        store = AttackMemoryStore(memory_path)
+        entry = AttackMemoryEntry(
+            entry_id="entry-1",
+            strategy_name="split-refund",
+            success=True,
+            violated_rule="Refunds above $100 require manager approval",
+            affected_component="process_refund",
+            signals=["two smaller refunds were accepted"],
+            round_number=1,
+            trace_id="trace-1",
+        )
+
+        # act
+        store.append(entry)
+
+        # assert
+        assert memory_path.exists()
+        assert store.read_all() == [entry]
+
+    def test_read_all_when_file_missing_expect_empty_list(self, tmp_path: Path) -> None:
+        # arrange
+        store = AttackMemoryStore(tmp_path / "missing.jsonl")
+
+        # act
+        entries = store.read_all()
+
+        # assert
+        assert entries == []
+
+    def test_append_many_when_multiple_entries_expect_in_write_order(self, tmp_path: Path) -> None:
+        # arrange
+        store = AttackMemoryStore(tmp_path / "attacks.jsonl")
+        first_entry = AttackMemoryEntry(
+            entry_id="entry-1",
+            strategy_name="split-refund",
+            success=True,
+            round_number=1,
+            trace_id="trace-1",
+        )
+        second_entry = AttackMemoryEntry(
+            entry_id="entry-2",
+            strategy_name="identity-spoofing",
+            success=False,
+            round_number=1,
+            trace_id="trace-2",
+        )
+
+        # act
+        store.append(first_entry)
+        store.append(second_entry)
+
+        # assert
+        assert store.read_all() == [first_entry, second_entry]
