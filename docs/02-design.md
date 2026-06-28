@@ -95,8 +95,8 @@ flowchart TD
     TraceCap -->|provides evidence| Evaluator
     Evaluator -->|reports success/failure| TriageAgent[Triage Agent]
     TriageAgent -->|pattern fix| Defender
-    TriageAgent -->|structural fix| CodingAgent[Coding Agent Stub]
-    CodingAgent -->|improves| ShieldedSystem
+    TriageAgent -.->|structural fix| CodingAgent[Coding Agent Stub — future]
+    CodingAgent -.->|improves| ShieldedSystem
 ```
 
 Production — the hardened Defender sits in front of the Shielded System, filtering all user interactions:
@@ -150,7 +150,7 @@ At each checkpoint receives: current event, conversation state, tool context, De
 
 Primary output is binary: **BLOCK** or **ALLOW**. The action taken on a BLOCK depends on the configured `defender_input_mode`:
 
-- **tip** (default): the Defender's analysis is injected as a security advisory into the Shielded System's context, letting it respond naturally while being warned about the threat. The Shielded System is still called.
+- **tip** (default): the Defender's analysis is injected as a security advisory into the Shielded System's context via a `security_tip` parameter on the ShieldedSystem's `chat()` interface, letting it respond naturally while being warned about the threat. The Shielded System is still called.
 - **block** (legacy): the Shielded System is prevented from responding entirely; a canned rejection is returned.
 
 ### 7.5 Defender Memory
@@ -342,25 +342,24 @@ The arena orchestrator is the top-level loop that drives the adversarial self-pl
 
 ```text
 for round in 1..N:
-    1. Attack Agent generates attack set (queries its memory, produces ~10 attacks)
-    2. For each attack in the set (sequentially):
-        a. Send attack to the protected system (Defender + Shielded System)
-        b. Collect the full interaction trace
-        c. Evaluator judges the trace → verdict
-        d. If verdict is SUCCESS:
+    1. For each seed strategy (sequentially):
+        a. Create Attack Agent with memory context for this strategy
+        b. Run multi-turn conversation against the protected system (Defender + Shielded System)
+        c. Build trace from the completed conversation
+        d. Evaluator judges the trace → verdict
+        e. Tactical Reflector produces structured feedback
+        f. If verdict is SUCCESS:
             - Triage Agent classifies → memory update or code remediation
             - Update Defender memory (if Path A)
             - Log remediation proposal (if Path B)
-        e. Update Attack Agent memory (success or failure signal)
-    3. Compute round metrics (attack_success_rate, false_positive_rate)
-    4. Log round summary
+        g. Update Attack Agent memory (success or failure signal + reflection)
+    2. Log round summary
 ```
 
 Configuration (MVP defaults):
 
-* `rounds`: 3–5
-* `attacks_per_round`: ~10
-* `benign_scenarios_per_round`: 3 (run after attacks to measure false positives)
+* `rounds`: 3 (configurable via `settings.arena_rounds`)
+* `strategies_per_round`: 4 (the seed strategies: split-refund, identity-spoofing, social-engineering, prompt-extraction)
 
 The orchestrator owns the loop but delegates all intelligence to the agents. It is intentionally dumb — a for-loop with logging.
 
@@ -386,37 +385,30 @@ Every component depends on `common/`. The dashboard is a separate process — th
 
 ## 10. Storage
 
-For MVP, use local file-based storage.
+For MVP, use local file-based storage. Each arena run creates timestamped directories with a `latest` symlink for convenience. See [04-data-artifacts.md](04-data-artifacts.md) for full details.
 
 ```text
+data/events/
+  {YYYYMMDD_HHMMSS}/
+    arena_events.jsonl           ← event stream (all rounds)
+  latest -> {YYYYMMDD_HHMMSS}/   ← symlink to most recent run
+
 data/memory/
-  attacks/
-    generated_attacks.jsonl
-
-  traces/
-    trace_ATT_001.json
-    trace_ATT_002.json
-
-  evaluations/
-    eval_ATT_001.json
-    eval_ATT_002.json
-
-  defender_memory/
-    memory.jsonl
-
-  triage/
-    triage_ATT_001.json
-
-  events/
-    arena_events.jsonl
-
-  results/
-    experiment_summary.json
+  {YYYYMMDD_HHMMSS}/
+    attack_memory.jsonl          ← cumulative attack outcomes
+    defender_memory.jsonl        ← learned defender patterns
+    round_1/
+      traces/
+        {trace_id}.json          ← one trace per strategy conversation
+    round_2/
+      traces/
+        {trace_id}.json
+  latest -> {YYYYMMDD_HHMMSS}/   ← symlink to most recent run
 ```
 
 No database is required for MVP. Rationale:
 
-* **Scale is tiny.** The demo targets ~10 attacks per round across 3–5 rounds. Defender memory will hold at most a few dozen entries. Loading an entire JSONL file into memory and scanning it is trivial at this scale.
+* **Scale is tiny.** The demo targets 4 strategies per round across 3 rounds. Defender memory will hold at most a few dozen entries. Loading an entire JSONL file into memory and scanning it is trivial at this scale.
 * **Retrieval is simple.** MVP retrieval loads all entries and passes them to the LLM as context. No index or random access needed.
 * **No concurrent access.** The arena runs attacks sequentially — no parallel reader/writer contention on memory files.
 * **Append-only writes.** Both Defender and Attack Agent memory are append-only during the arena loop. JSONL is a natural fit.

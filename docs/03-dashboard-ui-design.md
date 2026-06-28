@@ -123,25 +123,26 @@ class ArenaEvent(BaseModel):
 
 ### 4.3 EventEmitter
 
-Located in `src/common/events.py`. Injected into the arena runner. Each arena component calls `emitter.emit(event)` at the appropriate point. The emitter appends one JSON line to the event file per call. Thread-safe via file locking.
+Located in `common/src/event_emitter.py`. Injected into the arena runner. Each arena component calls `emitter.emit(event)` at the appropriate point. The emitter appends one JSON line to the event file per call.
 
 ## 5. Architecture
 
 ### 5.1 File Structure
 
 ```text
-src/
-  common/
-    events.py            # ArenaEvent model, ArenaEventType enum, EventEmitter
+common/
+  src/
+    event_emitter.py      # ArenaEvent model, EventType enum, EventEmitter
 
-  dashboard/
+dashboard/
+  src/
     app.py               # FastAPI app, serves static files, WebSocket endpoint
     event_watcher.py      # Async file tailer, yields new ArenaEvent objects
 
-    static/
-      index.html          # Single-page layout with Tailwind CDN
-      app.js              # WebSocket client, event dispatch, DOM updates
-      styles.css          # Minimal custom styles beyond Tailwind
+  static/
+    index.html          # Single-page layout with Tailwind CDN
+    app.js              # WebSocket client, event dispatch, DOM updates
+    styles.css          # Minimal custom styles beyond Tailwind
 ```
 
 ### 5.2 Data Flow
@@ -228,10 +229,10 @@ The two-column layout collapses to stacked on small screens (Tailwind responsive
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run python -m src.dashboard.app --events-file data/events/arena_events.jsonl --port 8080
+uv run python -m dashboard.src
 
-# Terminal 2: Run the arena experiment (emits events to the same file)
-uv run python -m src.runner.run_experiment
+# Terminal 2: Run the arena experiment (emits events to data/events/{timestamp}/)
+uv run python -m runner.src
 ```
 
 The dashboard can be started before, during, or after the arena run. It replays past events on connect and tails for new ones.

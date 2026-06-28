@@ -149,6 +149,8 @@ The [`event_watcher`](../dashboard/src/event_watcher.py) tails the JSONL file, r
 
 The [`AttackAgent`](../attack_agent/src/agent.py) receives an `AttackMemory` instance at construction. When building its system prompt, it calls `memory.get_by_strategy(strategy_name)` and formats prior tactical reflections into the prompt — including what tactic was used, why it worked or failed, and defensive triggers encountered. Suggested mutations are always shown for failed attacks. For successful attacks, mutations are only shown when `mutate_successful_attacks=True` (default: `False`), so successful tactics are repeated as-is by default.
 
+Note: memory enriches the Attack Agent's *prompt* (what tactics to try), but strategy *selection* (which strategies run each round) currently uses the fixed set of 4 seed strategies in order. A `MemoryDrivenStrategySelector` exists in code but is not wired into the runner.
+
 ## CLI recipes
 
 | Recipe | Description |
