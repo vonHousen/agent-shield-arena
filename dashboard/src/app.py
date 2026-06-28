@@ -54,9 +54,13 @@ def main(
     events_file: Path = typer.Option(DEFAULT_EVENTS_PATH, help="JSONL file used as the arena event stream."),
     host: str = typer.Option(DEFAULT_HOST, help="Host to bind the dashboard server to."),
     port: int = typer.Option(DEFAULT_PORT, help="Port to bind the dashboard server to."),
+    reload: bool = typer.Option(False, help="Enable auto-reload on code changes."),
 ) -> None:
     """Run the dashboard development server."""
-    uvicorn.run(create_app(events_file), host=host, port=port)
+    if reload:
+        uvicorn.run("dashboard.src.app:app", host=host, port=port, reload=True)
+    else:
+        uvicorn.run(create_app(events_file), host=host, port=port)
 
 
 if __name__ == "__main__":

@@ -21,9 +21,9 @@ clear events_path="data/events/arena_events.jsonl":
 run delay="1" events_path="data/events/arena_events.jsonl":
     uv run python -m runner.src --delay {{ delay }} --events-path {{ events_path }}
 
-# Start the live dashboard server.
-dashboard:
-    uv run python -m dashboard.src
+# Start the live dashboard server (pass 'true' to enable code hot-reload).
+dashboard reload="false":
+    uv run python -m dashboard.src {{ if reload == "true" { "--reload" } else { "" } }}
 
 # Run the full CI pipeline locally (pre-commit checks + tests).
 ci: pre-commit-run test
