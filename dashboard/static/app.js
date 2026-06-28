@@ -754,26 +754,41 @@ function eventMatchesRoundFilter(roundNumber) {
   return state.currentRoundFilter === null || String(roundNumber) === state.currentRoundFilter;
 }
 
-function formatVerdictDetails(payload) {
-  const parts = [];
-  if (payload.violation_type) {
-    parts.push(payload.violation_type);
-  }
-  if (payload.violated_rule) {
-    parts.push(payload.violated_rule);
-  }
-  if (payload.evidence) {
-    parts.push(payload.evidence);
-  }
-  if (payload.severity) {
-    parts.push(`Severity: ${payload.severity}`);
-  }
+function createVerdictField(label, value) {
+  const row = document.createElement("div");
+  row.className = "verdict-field";
 
-  if (parts.length === 0) {
-    return "No violation was detected.";
-  }
+  const labelEl = document.createElement("span");
+  labelEl.className = "verdict-field-label";
+  labelEl.textContent = label;
 
-  return parts.join(" | ");
+  const valueEl = document.createElement("span");
+  valueEl.className = "verdict-field-value";
+  valueEl.textContent = value;
+
+  row.append(labelEl, valueEl);
+  return row;
+}
+
+function createSeverityField(severity) {
+  const row = document.createElement("div");
+  row.className = "verdict-field";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "verdict-field-label";
+  labelEl.textContent = "Severity";
+
+  const badge = document.createElement("span");
+  const level = severity.toLowerCase();
+  badge.className = `verdict-severity-badge verdict-severity-${level}`;
+  badge.textContent = severity;
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "verdict-field-value";
+  valueEl.appendChild(badge);
+
+  row.append(labelEl, valueEl);
+  return row;
 }
 
 function updateVerdictCard(payload) {
@@ -784,12 +799,31 @@ function updateVerdictCard(payload) {
   title.className = "verdict-card-title";
   title.textContent = payload.success ? "Attack succeeded" : "Attack failed";
 
-  const details = document.createElement("p");
-  details.className = "verdict-card-details";
-  details.textContent = formatVerdictDetails(payload);
-
   card.innerHTML = "";
-  card.append(title, details);
+  card.appendChild(title);
+
+  const hasFields = payload.violation_type || payload.violated_rule || payload.evidence || payload.severity;
+
+  if (!hasFields) {
+    const noViolation = document.createElement("p");
+    noViolation.className = "verdict-card-details";
+    noViolation.textContent = "No violation was detected.";
+    card.appendChild(noViolation);
+    return;
+  }
+
+  if (payload.violation_type) {
+    card.appendChild(createVerdictField("Violation", payload.violation_type));
+  }
+  if (payload.violated_rule) {
+    card.appendChild(createVerdictField("Rule", payload.violated_rule));
+  }
+  if (payload.evidence) {
+    card.appendChild(createVerdictField("Evidence", payload.evidence));
+  }
+  if (payload.severity) {
+    card.appendChild(createSeverityField(payload.severity));
+  }
 }
 
 function clearVerdictCard() {
@@ -901,39 +935,25 @@ function renderAdaptationCard() {
       header.textContent = `R${reflection.round_number} ${reflection.success ? "BREACHED" : "DEFENDED"}`;
       entry.append(header);
 
-      const tacticLabel = document.createElement("p");
-      tacticLabel.className = "adaptation-entry-detail text-zinc-500";
-      tacticLabel.textContent = "Tactic:";
-      const tacticValue = document.createElement("p");
-      tacticValue.className = "adaptation-entry-detail";
-      tacticValue.textContent = `"${reflection.tactic_used}"`;
-      entry.append(tacticLabel, tacticValue);
+      entry.appendChild(createVerdictField("Tactic", `"${reflection.tactic_used}"`));
 
       if (reflection.success) {
-        const whyLabel = document.createElement("p");
-        whyLabel.className = "adaptation-entry-detail text-zinc-500";
-        whyLabel.textContent = "Why:";
-        const whyValue = document.createElement("p");
-        whyValue.className = "adaptation-entry-detail";
-        whyValue.textContent = reflection.why_outcome;
-        entry.append(whyLabel, whyValue);
+        entry.appendChild(createVerdictField("Why", reflection.why_outcome));
       } else {
         if (reflection.defensive_trigger) {
-          const blockedLabel = document.createElement("p");
-          blockedLabel.className = "adaptation-entry-detail text-zinc-500";
-          blockedLabel.textContent = "Blocked:";
-          const blockedValue = document.createElement("p");
-          blockedValue.className = "adaptation-entry-detail";
-          blockedValue.textContent = reflection.defensive_trigger;
-          entry.append(blockedLabel, blockedValue);
+          entry.appendChild(createVerdictField("Blocked", reflection.defensive_trigger));
         }
 
         if (reflection.suggested_mutations && reflection.suggested_mutations.length > 0) {
-          const mutLabel = document.createElement("p");
-          mutLabel.className = "adaptation-entry-detail text-zinc-500";
-          mutLabel.textContent = "Next moves:";
-          entry.append(mutLabel);
+          const row = document.createElement("div");
+          row.className = "verdict-field";
 
+          const label = document.createElement("span");
+          label.className = "verdict-field-label";
+          label.textContent = "Next moves";
+
+          const value = document.createElement("span");
+          value.className = "verdict-field-value";
           const mutList = document.createElement("ol");
           mutList.className = "adaptation-mutations";
           for (const mutation of reflection.suggested_mutations) {
@@ -941,7 +961,9 @@ function renderAdaptationCard() {
             li.textContent = mutation;
             mutList.append(li);
           }
-          entry.append(mutList);
+          value.appendChild(mutList);
+          row.append(label, value);
+          entry.appendChild(row);
         }
       }
 

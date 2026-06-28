@@ -213,6 +213,63 @@ aside {
   overflow-wrap: anywhere;
 }
 
+.verdict-field {
+  display: flex;
+  gap: 0.625rem;
+  margin-bottom: 0.375rem;
+}
+
+.verdict-field:last-child {
+  margin-bottom: 0;
+}
+
+.verdict-field-label {
+  flex-shrink: 0;
+  width: 5.5rem;
+  color: #a1a1aa;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 0.1rem;
+}
+
+.verdict-field-value {
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.verdict-severity-badge {
+  display: inline-block;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.verdict-severity-high {
+  border-color: rgb(239 68 68 / 0.5);
+  background: rgb(239 68 68 / 0.14);
+  color: #fca5a5;
+}
+
+.verdict-severity-medium {
+  border-color: rgb(234 179 8 / 0.5);
+  background: rgb(234 179 8 / 0.14);
+  color: #fde047;
+}
+
+.verdict-severity-low {
+  border-color: rgb(113 113 122 / 0.5);
+  background: rgb(113 113 122 / 0.14);
+  color: #d4d4d8;
+}
+
 .comparison-row {
   display: grid;
   grid-template-columns: 4.5rem 1fr auto;
@@ -330,17 +387,10 @@ aside {
   color: #e4e4e7;
 }
 
-.adaptation-entry-detail {
-  margin: 0 0 0.25rem;
-  color: #d4d4d8;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-
 .adaptation-mutations {
-  margin: 0.25rem 0 0;
-  padding-left: 0;
-  color: #a1a1aa;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #d4d4d8;
   font-size: 0.8125rem;
   line-height: 1.5;
 }
