@@ -41,12 +41,14 @@ class StrategyResult:
         success: Whether the evaluator judged the attack successful.
         trace_id: Identifier of the trace that was evaluated.
         violation_type: Category of violation, when the attack succeeded.
+        defender_blocks: Number of Defender BLOCK decisions during the conversation.
     """
 
     strategy_name: str
     success: bool
     trace_id: str
     violation_type: str | None = None
+    defender_blocks: int = 0
 
 
 @dataclass(frozen=True)

@@ -38,6 +38,7 @@ def main(
     mock: bool = typer.Option(False, help="Use the mock shielded system instead of the real LLM-backed one."),
     mode: Annotated[str, typer.Option(help=f"Attack mode. Options: {MODE_LLM}, {MODE_SCENARIO}.")] = MODE_LLM,
     rounds: int = typer.Option(settings.arena_rounds, help="Number of arena rounds to run in LLM mode."),
+    no_defender: bool = typer.Option(False, "--no-defender", help="Run the arena without Defender guardrails."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable DEBUG-level logging."),
     log_file: Path = typer.Option(DEFAULT_LOG_FILE, help=f"Log file path. Defaults to {DEFAULT_LOG_FILE}."),
     scenario: str = typer.Option("all", help=f"Scenario to run. Options: all, {', '.join(ALL_SCENARIOS)}."),
@@ -51,12 +52,14 @@ def main(
         mock: Use the mock shielded system instead of the real LLM-backed one.
         mode: Attack mode, either canned scenarios or LLM-generated attacks.
         rounds: Number of arena rounds to run in LLM mode.
+        no_defender: Run without Defender guardrails.
         verbose: Enable DEBUG-level logging.
         log_file: Log file path.
         scenario: Canned scenario to run when mode is scenario.
     """
     setup_logging(verbose=verbose, log_file=log_file)
     _validate_mode(mode)
+    _defender_enabled = settings.defender_enabled and not no_defender
 
     events_path = create_run_dir(events_dir)
     memory_run_dir = create_memory_run_dir(memory_dir=memory_dir, run_id=events_path.parent.name)
