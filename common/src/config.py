@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     arena_rounds: int = Field(default=3, description="Number of arena rounds in a multi-round session")
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()  # ty: ignore[missing-argument]  # pydantic-settings loads values from env
