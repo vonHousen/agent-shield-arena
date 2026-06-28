@@ -99,6 +99,8 @@ flowchart TD
     CodingAgent -.->|improves| ShieldedSystem
 ```
 
+![Arena Architecture](assets/arena-diagram.svg)
+
 Production — the hardened Defender sits in front of the Shielded System, filtering all user interactions:
 
 ```mermaid
@@ -109,6 +111,8 @@ flowchart LR
     end
     Protected -->|response| User
 ```
+
+![Production Runtime](assets/runtime-diagram.svg)
 
 ## 7. Components
 

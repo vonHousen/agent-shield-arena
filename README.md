@@ -10,8 +10,13 @@ Documentation is in the [docs](docs/) directory. The most important documents ar
 
 - [Project Brief](docs/01-project-brief.md) - problem statement, terminology, product vision
 - [Design](docs/02-design.md) - architecture, components, arena loop, MVP scope
+- [Architecture Diagrams](docs/assets/) - visual SVG diagrams of the Arena and production runtime
 
 ## Architecture
+
+![Arena Architecture](docs/assets/arena-diagram.svg)
+
+![Production Runtime](docs/assets/runtime-diagram.svg)
 
 ```text
 shielded_system/        # The agent being protected

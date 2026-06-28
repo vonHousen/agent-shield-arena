@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="580" viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+
+  <defs>
+    <marker id="arrow-white" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e2e8f0"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f87171"/>
+    </marker>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#67e8f9"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+    </marker>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.4"/>
+    </filter>
+
+    <linearGradient id="grad-user" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569"/><stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="grad-defender" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="grad-shielded" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+    <linearGradient id="grad-dmem" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e40af"/><stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+    <linearGradient id="grad-tool" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="grad-response" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/><stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+    <linearGradient id="grad-reject" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="580" fill="#0f1117"/>
+
+  <!-- Title -->
+  <text x="480" y="36" text-anchor="middle" fill="#64748b" font-size="12" letter-spacing="2">AGENTSHIELD — PRODUCTION RUNTIME</text>
+
+  <!-- ═══════════ ARROWS ═══════════ -->
+
+  <!-- User → Defender -->
+  <path d="M 350 100 L 350 170" stroke="#e2e8f0" stroke-width="2.5" fill="none" marker-end="url(#arrow-white)"/>
+
+  <!-- Defender → Shielded System (ALLOW) -->
+  <path d="M 350 260 L 350 330" stroke="#34d399" stroke-width="2.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Defender → Rejection (BLOCK, left) -->
+  <path d="M 265 215 L 175 215" stroke="#f87171" stroke-width="2.5" fill="none" marker-end="url(#arrow-red)"/>
+
+  <!-- Shielded System → Tool call (right) -->
+  <path d="M 440 370 L 540 370" stroke="#a78bfa" stroke-width="2.5" fill="none" marker-end="url(#arrow-purple)"/>
+
+  <!-- Tool → Defender (checked, goes up) -->
+  <path d="M 600 345 C 600 290, 500 270, 435 240" stroke="#a78bfa" stroke-width="2" fill="none" marker-end="url(#arrow-purple)"/>
+
+  <!-- Defender ALLOW tool → Tool result back to Shielded System -->
+  <path d="M 435 230 C 520 230, 680 280, 680 370 C 680 430, 500 410, 440 395" stroke="#34d399" stroke-width="2" stroke-dasharray="5 3" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Shielded System → Response -->
+  <path d="M 350 410 L 350 470" stroke="#34d399" stroke-width="2.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Defender Memory → Defender -->
+  <path d="M 610 135 L 440 190" stroke="#67e8f9" stroke-width="2" stroke-dasharray="6 4" fill="none" marker-end="url(#arrow-cyan)" opacity="0.8"/>
+
+  <!-- ═══════════ NODES ═══════════ -->
+
+  <!-- User -->
+  <g filter="url(#shadow)">
+    <rect x="275" y="55" width="150" height="50" rx="25" fill="url(#grad-user)" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="350" y="78" text-anchor="middle" fill="white" font-size="15" font-weight="700">User</text>
+    <text x="350" y="95" text-anchor="middle" fill="#cbd5e1" font-size="10">sends request</text>
+  </g>
+
+  <!-- Defender -->
+  <g filter="url(#shadow)">
+    <rect x="265" y="180" width="180" height="75" rx="12" fill="url(#grad-defender)" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="355" y="210" text-anchor="middle" fill="white" font-size="16" font-weight="700">Defender</text>
+    <text x="355" y="232" text-anchor="middle" fill="#bfdbfe" font-size="11">on_user_input</text>
+    <text x="355" y="247" text-anchor="middle" fill="#bfdbfe" font-size="11">on_tool_call</text>
+  </g>
+
+  <!-- Rejection -->
+  <g filter="url(#shadow)">
+    <rect x="55" y="194" width="120" height="44" rx="10" fill="url(#grad-reject)" stroke="#f87171" stroke-width="1.5"/>
+    <text x="115" y="221" text-anchor="middle" fill="white" font-size="13" font-weight="700">Rejection</text>
+  </g>
+
+  <!-- Shielded System -->
+  <g filter="url(#shadow)">
+    <rect x="265" y="340" width="180" height="65" rx="12" fill="url(#grad-shielded)" stroke="#a5b4fc" stroke-width="1.5"/>
+    <text x="355" y="368" text-anchor="middle" fill="white" font-size="15" font-weight="700">Shielded System</text>
+    <text x="355" y="388" text-anchor="middle" fill="#c7d2fe" font-size="11">Processes request</text>
+  </g>
+
+  <!-- Tool -->
+  <g filter="url(#shadow)">
+    <rect x="545" y="348" width="110" height="48" rx="10" fill="url(#grad-tool)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="600" y="377" text-anchor="middle" fill="white" font-size="13" font-weight="700">Tool</text>
+  </g>
+
+  <!-- Response -->
+  <g filter="url(#shadow)">
+    <rect x="275" y="480" width="150" height="50" rx="25" fill="url(#grad-response)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="350" y="510" text-anchor="middle" fill="white" font-size="15" font-weight="700">Response</text>
+  </g>
+
+  <!-- Defender Memory -->
+  <g filter="url(#shadow)">
+    <rect x="610" y="100" width="170" height="65" rx="12" fill="url(#grad-dmem)" stroke="#93c5fd" stroke-width="1.5"/>
+    <text x="695" y="128" text-anchor="middle" fill="white" font-size="13" font-weight="700">Defender Memory</text>
+    <text x="695" y="148" text-anchor="middle" fill="#bfdbfe" font-size="10">Hardened from Arena</text>
+  </g>
+
+  <!-- ═══════════ LABELS ═══════════ -->
+
+  <text x="362" y="155" fill="#94a3b8" font-size="11" font-weight="500">request</text>
+
+  <!-- BLOCK badge -->
+  <rect x="193" y="200" width="52" height="18" rx="4" fill="#7f1d1d"/>
+  <text x="219" y="214" text-anchor="middle" fill="#f87171" font-size="10" font-weight="700">BLOCK</text>
+
+  <!-- ALLOW badge (down) -->
+  <rect x="360" y="290" width="50" height="16" rx="4" fill="#065f46"/>
+  <text x="385" y="302" text-anchor="middle" fill="#34d399" font-size="10" font-weight="700">ALLOW</text>
+
+  <!-- tool call label -->
+  <text x="480" y="360" fill="#a78bfa" font-size="10" font-weight="500">tool call</text>
+
+  <!-- checks label on curve -->
+  <text x="530" y="300" fill="#a78bfa" font-size="10" font-weight="500">checks</text>
+
+  <!-- result label -->
+  <text x="620" y="310" fill="#34d399" font-size="10" font-weight="500" opacity="0.8">result</text>
+
+  <!-- memory label -->
+  <text x="530" y="150" fill="#67e8f9" font-size="10" font-weight="500">learned patterns</text>
+
+  <!-- ═══════════ ANNOTATION ═══════════ -->
+  <text x="480" y="556" text-anchor="middle" fill="#475569" font-size="12" font-style="italic">One Defender, two checkpoints — real-time decisions using Arena-learned patterns</text>
+
+</svg>
