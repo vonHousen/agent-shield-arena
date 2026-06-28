@@ -87,7 +87,7 @@ class TestListRuns:
 
         # assert
         runs = response.json()
-        assert runs[0]["timestamp"] == "2026-06-27T14:30:22"
+        assert runs[0]["timestamp"] == "2026-06-27T14:30:22+00:00"
 
 
 def _create_run_dir(events_dir: Path, name: str) -> Path:

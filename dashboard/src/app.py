@@ -1,6 +1,6 @@
 """FastAPI dashboard application for live arena events."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -84,7 +84,7 @@ def _list_runs(events_dir: Path) -> list[dict[str, str]]:
         if not events_file.exists():
             continue
         try:
-            ts = datetime.strptime(entry.name, TIMESTAMP_FORMAT)
+            ts = datetime.strptime(entry.name, TIMESTAMP_FORMAT).replace(tzinfo=UTC)
         except ValueError:
             continue
         runs.append({"id": entry.name, "timestamp": ts.isoformat()})
