@@ -10,6 +10,8 @@ from attack_agent.src.memory import AttackMemory
 from common.src.config import settings
 from common.src.event_emitter import DEFAULT_EVENTS_DIR, EventEmitter, create_run_dir
 from common.src.logging import DEFAULT_LOG_FILE, setup_logging
+from defender_agent.src.defender import Defender
+from defender_agent.src.memory import DefenderMemory
 from evaluator.src.evaluator import Evaluator
 from runner.src.adapter import RealShieldedSystemAdapter
 from runner.src.arena_artifacts import (
@@ -21,10 +23,12 @@ from runner.src.mock_system import MockShieldedSystem
 from runner.src.runner import run_all_scenarios, run_arena, run_attack_scenario
 from runner.src.scenario import ALL_SCENARIOS
 from shielded_system.src.tools import reset_customer_db
+from triage_agent.src.triage import TriageAgent
 
 MODE_LLM = "llm"
 MODE_SCENARIO = "scenario"
 BUSINESS_RULES_PATH = Path("shielded_system/src/business_rules.txt")
+DEFENDER_MEMORY_FILENAME = "defender_memory.jsonl"
 
 
 def main(
@@ -68,16 +72,27 @@ def main(
     system = MockShieldedSystem() if mock else RealShieldedSystemAdapter()
 
     if mode == MODE_LLM:
+        business_rules = _load_business_rules()
+        defender = None
+        defender_memory = None
+        triage_agent = None
+        if _defender_enabled:
+            defender_memory = DefenderMemory(memory_run_dir / DEFENDER_MEMORY_FILENAME)
+            defender = Defender(business_rules=business_rules, memory=defender_memory)
+            triage_agent = TriageAgent()
         asyncio.run(
             run_arena(
                 shielded_system=system,
                 event_emitter=event_emitter,
                 evaluator=Evaluator(),
                 memory=AttackMemory(memory_run_dir / ATTACK_MEMORY_FILENAME),
-                business_rules=_load_business_rules(),
+                business_rules=business_rules,
                 memory_run_dir=memory_run_dir,
                 rounds=rounds,
                 turn_delay_seconds=delay,
+                defender=defender,
+                defender_memory=defender_memory,
+                triage_agent=triage_agent,
             )
         )
         return

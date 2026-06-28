@@ -9,6 +9,7 @@ from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EVENTS_FILENAME
 from common.src.models import EvaluationVerdict, Trace
 from runner.src import __main__ as runner_main
+from runner.src.models import ArenaResult
 from runner.src.simple_evaluator import HeuristicEvaluator
 from shielded_system.src.models import ChatMessage
 
@@ -58,6 +59,53 @@ class FakeReflector:
             why_outcome="test outcome",
             suggested_mutations=["try something else"],
         )
+
+
+class FakeDefender:
+    """Defender double used to verify CLI wiring."""
+
+    def __init__(self, business_rules: str, memory: object) -> None:
+        """Initialize.
+
+        Args:
+            business_rules: Business rules supplied by the CLI.
+            memory: Defender memory supplied by the CLI.
+        """
+        self.business_rules = business_rules
+        self.memory = memory
+
+
+class FakeDefenderMemory:
+    """Defender memory double used to verify CLI wiring."""
+
+    def __init__(self, memory_path: Path) -> None:
+        """Initialize.
+
+        Args:
+            memory_path: Path supplied by the CLI.
+        """
+        self.memory_path = memory_path
+
+
+class FakeTriageAgent:
+    """Triage agent double used to verify CLI wiring."""
+
+
+class CapturingRunArena:
+    """Callable test double that records run_arena keyword arguments."""
+
+    def __init__(self) -> None:
+        """Initialize captured call storage."""
+        self.kwargs: dict[str, object] | None = None
+
+    async def __call__(self, **kwargs: object) -> ArenaResult:
+        """Record keyword arguments and return an empty arena result.
+
+        Args:
+            kwargs: Keyword arguments passed by the CLI.
+        """
+        self.kwargs = kwargs
+        return ArenaResult(rounds=[])
 
 
 def _read_events(events_dir: Path) -> list[dict]:
@@ -117,6 +165,7 @@ class TestMain:
                 mock=True,
                 mode="llm",
                 rounds=1,
+                no_defender=True,
                 verbose=False,
                 log_file=tmp_path / "arena.log",
                 scenario="all",
@@ -170,6 +219,37 @@ class TestMain:
         assert len(verdict_events) == rounds * len(TWO_TEST_STRATEGIES)
         assert len(memory_entries) == rounds * len(TWO_TEST_STRATEGIES)
         assert len(trace_files) == rounds * len(TWO_TEST_STRATEGIES)
+
+    def test_when_defender_enabled_expect_cli_passes_defender_stack_to_arena(self, tmp_path: Path) -> None:
+        """Verify the default LLM CLI path wires Defender, DefenderMemory, and TriageAgent."""
+        # arrange
+        captured_run_arena = CapturingRunArena()
+
+        # act
+        with (
+            patch("runner.src.__main__.run_arena", captured_run_arena),
+            patch("runner.src.__main__.Defender", FakeDefender, create=True),
+            patch("runner.src.__main__.DefenderMemory", FakeDefenderMemory, create=True),
+            patch("runner.src.__main__.TriageAgent", FakeTriageAgent, create=True),
+        ):
+            runner_main.main(
+                events_dir=tmp_path / "events",
+                memory_dir=tmp_path / "memory",
+                delay=0,
+                mock=True,
+                mode="llm",
+                rounds=1,
+                no_defender=False,
+                verbose=False,
+                log_file=tmp_path / "arena.log",
+                scenario="all",
+            )
+
+        # assert
+        assert captured_run_arena.kwargs is not None
+        assert isinstance(captured_run_arena.kwargs["defender"], FakeDefender)
+        assert isinstance(captured_run_arena.kwargs["defender_memory"], FakeDefenderMemory)
+        assert isinstance(captured_run_arena.kwargs["triage_agent"], FakeTriageAgent)
 
     def test_when_invalid_mode_expect_bad_parameter(self, tmp_path: Path) -> None:
         """Verify CLI mode validation rejects unknown modes."""
