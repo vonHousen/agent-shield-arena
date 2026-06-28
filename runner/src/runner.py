@@ -247,6 +247,7 @@ async def run_all_scenarios(
     shielded_system: ShieldedSystem,
     event_emitter: EventEmitter,
     turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+    scenario_pause_seconds: float = SCENARIO_PAUSE_SECONDS,
 ) -> dict[str, list[ShieldedSystemResponse]]:
     """Run every registered attack scenario sequentially.
 
@@ -257,6 +258,7 @@ async def run_all_scenarios(
         shielded_system: System under test.
         event_emitter: Sink for arena events.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
+        scenario_pause_seconds: Pause between scenarios for demo pacing.
     """
     all_scenarios = get_all_scenarios()
     all_responses: dict[str, list[ShieldedSystemResponse]] = {}
@@ -273,7 +275,8 @@ async def run_all_scenarios(
                 turn_delay_seconds=turn_delay_seconds,
             )
             all_responses[name] = responses
-            await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+            if scenario_pause_seconds > 0:
+                await asyncio.sleep(scenario_pause_seconds)
     finally:
         _emit_run_completed(event_emitter)
 
@@ -285,6 +288,7 @@ async def run_all_llm_scenarios(
     shielded_system: ShieldedSystem,
     event_emitter: EventEmitter,
     turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+    scenario_pause_seconds: float = SCENARIO_PAUSE_SECONDS,
 ) -> dict[str, list[ShieldedSystemResponse]]:
     """Run one LLM-driven conversation per seed strategy.
 
@@ -295,6 +299,7 @@ async def run_all_llm_scenarios(
         shielded_system: System under test.
         event_emitter: Sink for arena events.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
+        scenario_pause_seconds: Pause between scenarios for demo pacing.
     """
     all_responses: dict[str, list[ShieldedSystemResponse]] = {}
 
@@ -311,7 +316,8 @@ async def run_all_llm_scenarios(
                 turn_delay_seconds=turn_delay_seconds,
             )
             all_responses[strategy.name] = responses
-            await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+            if scenario_pause_seconds > 0:
+                await asyncio.sleep(scenario_pause_seconds)
     finally:
         _emit_run_completed(event_emitter)
 

@@ -144,6 +144,7 @@ class TestRunAllScenarios:
             shielded_system=MockShieldedSystem(),
             event_emitter=event_emitter,
             turn_delay_seconds=0,
+            scenario_pause_seconds=0,
         )
 
         # assert
@@ -253,6 +254,7 @@ class TestRunAllLlmScenarios:
                 shielded_system=RecordingShieldedSystem(),
                 event_emitter=event_emitter,
                 turn_delay_seconds=0,
+                scenario_pause_seconds=0,
             )
 
         # assert
