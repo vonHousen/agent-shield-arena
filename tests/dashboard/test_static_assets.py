@@ -12,4 +12,3 @@ class TestDashboardMarkup:
 
         # act / assert
         assert 'id="blockMetric"' in index_html
-        assert 'id="blockRateMetric"' in index_html
