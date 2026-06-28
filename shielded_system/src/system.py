@@ -75,14 +75,17 @@ class ShieldedSystem:
         self._llm_client = llm_client or LiteLLMClient()
         self._system_prompt = system_prompt or build_system_prompt(load_business_rules())
 
-    async def chat(self, message: str, history: list[ChatMessage] | None = None) -> Response:
+    async def chat(
+        self, message: str, history: list[ChatMessage] | None = None, security_tip: str | None = None
+    ) -> Response:
         """Respond to a user message and execute any requested support tools.
 
         Args:
             message: Latest user message.
             history: Previous conversation turns.
+            security_tip: Optional security advisory to inject before the user message.
         """
-        messages = _build_messages(self._system_prompt, message, history or [])
+        messages = _build_messages(self._system_prompt, message, history or [], security_tip=security_tip)
         tool_calls: list[ToolInvocation] = []
 
         for _round_number in range(MAX_TOOL_ROUNDS):
@@ -116,9 +119,13 @@ async def chat(message: str, history: list[ChatMessage] | None = None) -> Respon
     return await shielded_system.chat(message=message, history=history)
 
 
-def _build_messages(system_prompt: str, message: str, history: list[ChatMessage]) -> list[dict[str, Any]]:
+def _build_messages(
+    system_prompt: str, message: str, history: list[ChatMessage], security_tip: str | None = None
+) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     messages.extend(_history_messages(history))
+    if security_tip:
+        messages.append({"role": "system", "content": security_tip})
     messages.append({"role": "user", "content": message})
     return messages
 

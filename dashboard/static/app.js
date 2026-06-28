@@ -557,6 +557,8 @@ function rerenderConversation() {
       appendToolResult(event.payload);
     } else if (event.event_type === "defender_decision") {
       appendDefenderDecision(event.payload);
+    } else if (event.event_type === "defender_tip") {
+      appendDefenderTip(event.payload);
     } else if (event.event_type === "content_filter") {
       appendContentFilter(event.payload);
     }
@@ -695,6 +697,26 @@ function createDefenderDetail(label, value) {
 
   row.append(labelEl, valueEl);
   return row;
+}
+
+function appendDefenderTip(payload) {
+  const row = document.createElement("div");
+  row.className = "message-row message-row-right";
+
+  const card = document.createElement("div");
+  card.className = "defender-tip-card";
+
+  const label = document.createElement("p");
+  label.className = "defender-tip-label";
+  label.textContent = "SECURITY TIP INJECTED";
+
+  const text = document.createElement("p");
+  text.className = "defender-tip-text";
+  text.textContent = payload.tip_text;
+
+  card.append(label, text);
+  row.append(card);
+  appendConversationNode(row);
 }
 
 function appendConversationNode(node) {

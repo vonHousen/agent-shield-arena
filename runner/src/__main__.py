@@ -43,6 +43,9 @@ def main(
     mode: Annotated[str, typer.Option(help=f"Attack mode. Options: {MODE_LLM}, {MODE_SCENARIO}.")] = MODE_LLM,
     rounds: int = typer.Option(settings.arena_rounds, help="Number of arena rounds to run in LLM mode."),
     no_defender: bool = typer.Option(False, "--no-defender", help="Run the arena without Defender guardrails."),
+    defender_mode: Annotated[
+        str, typer.Option(help="Defender input mode: 'tip' or 'block'.")
+    ] = settings.defender_input_mode,
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable DEBUG-level logging."),
     log_file: Path = typer.Option(DEFAULT_LOG_FILE, help=f"Log file path. Defaults to {DEFAULT_LOG_FILE}."),
     scenario: str = typer.Option("all", help=f"Scenario to run. Options: all, {', '.join(ALL_SCENARIOS)}."),
@@ -57,6 +60,7 @@ def main(
         mode: Attack mode, either canned scenarios or LLM-generated attacks.
         rounds: Number of arena rounds to run in LLM mode.
         no_defender: Run without Defender guardrails.
+        defender_mode: How to handle BLOCK decisions on user input ('tip' or 'block').
         verbose: Enable DEBUG-level logging.
         log_file: Log file path.
         scenario: Canned scenario to run when mode is scenario.
@@ -93,6 +97,7 @@ def main(
                 defender=defender,
                 defender_memory=defender_memory,
                 triage_agent=triage_agent,
+                defender_input_mode=defender_mode,
             )
         )
         return

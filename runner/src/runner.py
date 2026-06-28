@@ -234,6 +234,7 @@ async def run_arena(
     defender: Defender | None = None,
     defender_memory: DefenderMemory | None = None,
     triage_agent: TriageAgent | None = None,
+    defender_input_mode: str = "tip",
 ) -> ArenaResult:
     """Run a multi-round arena loop with evaluation and attack memory updates.
 
@@ -252,10 +253,15 @@ async def run_arena(
         defender: Optional Defender used to wrap the shielded system.
         defender_memory: Optional Defender memory receiving triaged patterns.
         triage_agent: Optional Triage Agent for successful attacks.
+        defender_input_mode: How to handle BLOCK decisions on user input ('block' or 'tip').
     """
     arena_strategies = strategies or SEED_STRATEGIES
     arena_reflector = reflector or TacticalReflector()
-    defended_system = DefendedSystem(shielded_system, defender, event_emitter) if defender is not None else None
+    defended_system = (
+        DefendedSystem(shielded_system, defender, event_emitter, input_mode=defender_input_mode)  # ty: ignore[invalid-argument-type]  # concrete types satisfy both protocols
+        if defender is not None
+        else None
+    )
     active_system = defended_system if defended_system is not None else shielded_system
     round_results: list[RoundResult] = []
 

@@ -104,6 +104,7 @@ class ArenaEvent(BaseModel):
 | `attack_started` | attack_id, strategy, target_rule | Each attack begins |
 | `message` | attack_id, role, content | Each conversation message |
 | `defender_decision` | attack_id, checkpoint, decision, reasoning | Defender ALLOW/BLOCK |
+| `defender_tip` | tip_text | Security advisory injected into assistant context (tip mode) |
 | `tool_call` | attack_id, tool_name, arguments | Shielded System invokes a tool |
 | `tool_result` | attack_id, tool_name, result | Tool returns result |
 | `attack_completed` | attack_id, final_response | Conversation ends |
@@ -195,6 +196,7 @@ If the event file does not exist when the dashboard starts (no experiment has ru
 | `attack_started` | Add attack to sidebar list, select it, clear conversation area |
 | `message` | Append styled message bubble to conversation |
 | `defender_decision` | Append decision badge to conversation |
+| `defender_tip` | Append amber system-note card showing the injected advisory |
 | `tool_call` | Append collapsible tool-call card |
 | `tool_result` | Update the tool-call card with result |
 | `attack_completed` | Update attack sidebar status |

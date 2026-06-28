@@ -10,12 +10,15 @@ MOCK_REFUND_AMOUNT = 90
 class MockShieldedSystem:
     """Deterministic shielded system test double for Stream C."""
 
-    async def chat(self, message: str, history: list[tuple[str, str]]) -> ShieldedSystemResponse:
+    async def chat(
+        self, message: str, history: list[tuple[str, str]], security_tip: str | None = None
+    ) -> ShieldedSystemResponse:
         """Respond to a user message and optionally simulate a tool call.
 
         Args:
             message: User message to process.
             history: Prior conversation turns as role/content tuples.
+            security_tip: Optional security advisory (ignored by mock).
         """
         refund_count = _count_prior_refunds(history) + 1
         refund_id = f"REF-{refund_count:03d}"

@@ -1,5 +1,7 @@
 """Application configuration loaded from environment variables."""
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -26,6 +28,11 @@ class Settings(BaseSettings):
     )
 
     defender_enabled: bool = Field(default=True, description="Toggle to run the arena with or without the Defender")
+
+    defender_input_mode: Literal["block", "tip"] = Field(
+        default="tip",
+        description="How to handle BLOCK decisions on user input: 'block' hard-blocks, 'tip' advises the assistant.",
+    )
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

@@ -148,7 +148,10 @@ Checkpoints: `on_user_input`, `on_tool_call` (MVP). Optional: `on_retrieved_cont
 
 At each checkpoint receives: current event, conversation state, tool context, Defender memory, previous trace. Optionally also business rules if provided.
 
-Primary output is binary: **BLOCK** (prevent the Shielded System from responding) or **ALLOW** (the interaction is believed safe). Everything else (logging, escalation signals, confidence scores) is secondary instrumentation.
+Primary output is binary: **BLOCK** or **ALLOW**. The action taken on a BLOCK depends on the configured `defender_input_mode`:
+
+- **tip** (default): the Defender's analysis is injected as a security advisory into the Shielded System's context, letting it respond naturally while being warned about the threat. The Shielded System is still called.
+- **block** (legacy): the Shielded System is prevented from responding entirely; a canned rejection is returned.
 
 ### 7.5 Defender Memory
 
@@ -281,7 +284,7 @@ flowchart TD
 
 Four phases per round:
 
-1. **Guard** — at each checkpoint, assemble the event with conversation state, match business rules, retrieve relevant patterns from memory, and make a binary BLOCK/ALLOW decision.
+1. **Guard** — at each checkpoint, assemble the event with conversation state, match business rules, retrieve relevant patterns from memory, and make a binary BLOCK/ALLOW decision. In tip mode (default), a BLOCK injects a security advisory into the Shielded System's context rather than hard-rejecting; in block mode, the interaction is halted outright.
 2. **Observe** — every interaction (blocked or allowed) is captured in a trace.
 3. **Evaluate** — the Evaluator checks whether an attack succeeded despite the Defender. Only failures (attacks that got through) trigger learning.
 4. **Learn** — the Triage Agent classifies each failure. If the Defender could have caught it with better pattern recognition, a generalized pattern is extracted and auto-appended to memory. If the attack exploits a structural flaw (missing authorization, unenforced limits), it's routed to code remediation for human review.
@@ -296,7 +299,9 @@ In production, the Attack Agent and Evaluator are gone. The Defender sits in fro
 flowchart TD
     User([User]) -->|request| InputCk{"on_user_input\nBLOCK or ALLOW?"}
 
-    InputCk -->|BLOCK| Reject["Return rejection notice to user"]
+    InputCk -->|"BLOCK (tip mode)"| Tip[Inject security advisory into context]
+    Tip --> SS
+    InputCk -->|"BLOCK (block mode)"| Reject["Return rejection notice to user"]
     InputCk -->|ALLOW| SS[Shielded System processes request]
 
     SS --> Action{Shielded System action?}

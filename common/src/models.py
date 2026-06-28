@@ -21,6 +21,7 @@ class EventType(StrEnum):
     ATTACK_BRIEFING = "attack_briefing"
     ATTACKER_REASONING = "attacker_reasoning"
     DEFENDER_DECISION = "defender_decision"
+    DEFENDER_TIP = "defender_tip"
     TRIAGE_DECISION = "triage_decision"
     CONTENT_FILTER = "content_filter"
 
@@ -222,6 +223,16 @@ class DefenderDecision(BaseModel):
     tool_arguments: dict[str, Any] | None = None
 
 
+class DefenderTip(BaseModel):
+    """Security advisory injected into the assistant context when defender tip mode is active.
+
+    Args:
+        tip_text: The full advisory text sent to the shielded system.
+    """
+
+    tip_text: str
+
+
 class TriageDecision(BaseModel):
     """Triage agent output classifying a successful attack into a remediation path.
 
@@ -282,6 +293,7 @@ class ArenaEvent(BaseModel):
         | AttackBriefing
         | AttackerReasoning
         | DefenderDecision
+        | DefenderTip
         | TriageDecision
         | ContentFilterEvent
     )
