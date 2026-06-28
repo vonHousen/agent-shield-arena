@@ -39,11 +39,7 @@ const elements = {
   scenarioTabs: document.querySelector("#scenarioTabs"),
   roundMetric: document.querySelector("#roundMetric"),
   scenarioMetric: document.querySelector("#scenarioMetric"),
-  messageMetric: document.querySelector("#messageMetric"),
-  toolCallMetric: document.querySelector("#toolCallMetric"),
-  successRateMetric: document.querySelector("#successRateMetric"),
   blockMetric: document.querySelector("#blockMetric"),
-  blockRateMetric: document.querySelector("#blockRateMetric"),
   verdictCard: document.querySelector("#verdictCard"),
   runSelector: document.querySelector("#runSelector"),
   roundComparisonCard: document.querySelector("#roundComparisonCard"),
@@ -599,7 +595,6 @@ function appendToolCall(payload) {
 
   const details = document.createElement("details");
   details.className = "tool-card";
-  details.open = true;
 
   const summary = document.createElement("summary");
   summary.className = "tool-summary";
@@ -620,7 +615,6 @@ function appendToolResult(payload) {
 
   const details = document.createElement("details");
   details.className = "tool-card tool-result";
-  details.open = true;
 
   const summary = document.createElement("summary");
   summary.className = "tool-summary";
@@ -736,19 +730,9 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
-  const defended = state.verdicts - state.successfulVerdicts;
-  const defenseRate = state.verdicts === 0 ? 0 : Math.round((defended / state.verdicts) * 100);
-  const blockRate =
-    state.defenderDecisions === 0 ? 0 : Math.round((state.defenderBlocks / state.defenderDecisions) * 100);
-  const metrics = state.scenarioMetrics[ALL_FILTER];
-
   elements.roundMetric.textContent = state.rounds.length;
   elements.scenarioMetric.textContent = state.scenarios;
-  elements.messageMetric.textContent = metrics.messages;
-  elements.toolCallMetric.textContent = metrics.toolCalls;
-  elements.successRateMetric.textContent = `${defenseRate}%`;
   elements.blockMetric.textContent = state.defenderBlocks;
-  elements.blockRateMetric.textContent = `${blockRate}%`;
 }
 
 function updateHeaderSummary() {
