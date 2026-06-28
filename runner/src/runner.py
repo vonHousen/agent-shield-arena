@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Protocol
 
 from attack_agent.src.agent import AttackAgent
-from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry, TacticalReflection
+from attack_agent.src.reflector import TacticalReflector
 from attack_agent.src.strategies import SEED_STRATEGIES, AttackStrategy
 from common.src.config import settings
 from common.src.event_emitter import EventEmitter
@@ -56,6 +57,18 @@ class Evaluator(Protocol):
         Args:
             trace: Completed conversation trace.
             business_rules: Shielded system business rules.
+        """
+
+
+class Reflector(Protocol):
+    """Reflector interface used by the arena loop."""
+
+    async def reflect(self, trace: Trace, verdict: EvaluationVerdict) -> TacticalReflection:
+        """Produce tactical feedback from a completed conversation.
+
+        Args:
+            trace: Full conversation and tool execution trace.
+            verdict: Evaluator's judgment of whether the attack succeeded.
         """
 
 
@@ -155,6 +168,7 @@ async def run_arena(
     strategies: Sequence[AttackStrategy] | None = None,
     attack_source_factory: Callable[[AttackStrategy, int], AttackSource] | None = None,
     turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+    reflector: Reflector | None = None,
 ) -> ArenaResult:
     """Run a multi-round arena loop with evaluation and attack memory updates.
 
@@ -169,8 +183,10 @@ async def run_arena(
         strategies: Strategies to execute in each round.
         attack_source_factory: Optional factory used by tests to provide attack sources.
         turn_delay_seconds: Delay between turns for real-time demo pacing.
+        reflector: Tactical reflector for producing actionable feedback per conversation.
     """
     arena_strategies = strategies or SEED_STRATEGIES
+    arena_reflector = reflector or TacticalReflector()
     round_results: list[RoundResult] = []
 
     _emit_run_started(event_emitter, len(arena_strategies))
@@ -199,7 +215,8 @@ async def run_arena(
                 )
                 save_trace(trace=trace, memory_round_dir=memory_round_dir)
                 verdict = await evaluator.evaluate(trace=trace, business_rules=business_rules)
-                memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict))
+                reflection = await arena_reflector.reflect(trace=trace, verdict=verdict)
+                memory.append(_memory_entry_from_verdict(strategy.name, round_number, verdict, reflection))
                 _emit_evaluation_verdict(event_emitter, verdict)
                 strategy_results.append(
                     StrategyResult(
@@ -407,14 +424,14 @@ def _memory_entry_from_verdict(
     strategy_name: str,
     round_number: int,
     verdict: EvaluationVerdict,
+    reflection: TacticalReflection | None = None,
 ) -> AttackMemoryEntry:
-    signals = [verdict.evidence] if verdict.evidence is not None else []
     return AttackMemoryEntry(
         strategy_name=strategy_name,
         success=verdict.success,
         violated_rule=verdict.violated_rule,
         affected_component=verdict.violation_type,
-        signals=signals,
+        reflection=reflection,
         round_number=round_number,
         trace_id=verdict.trace_id,
     )

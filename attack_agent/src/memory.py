@@ -6,6 +6,22 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 
+class TacticalReflection(BaseModel):
+    """Structured tactical feedback produced by the reflector after each conversation.
+
+    Args:
+        tactic_used: The specific conversational tactic the attacker employed.
+        why_outcome: Why the tactic succeeded or failed — what behavior was triggered or bypassed.
+        defensive_trigger: Which defensive behavior blocked the attack (None if attack succeeded).
+        suggested_mutations: Concrete alternative approaches for the next attempt.
+    """
+
+    tactic_used: str
+    why_outcome: str
+    defensive_trigger: str | None = None
+    suggested_mutations: list[str] = Field(default_factory=list)
+
+
 class AttackMemoryEntry(BaseModel):
     """What gets stored per conversation outcome.
 
@@ -15,7 +31,7 @@ class AttackMemoryEntry(BaseModel):
         success: Whether the attack achieved a business-rule violation.
         violated_rule: The specific business rule that was violated, if any.
         affected_component: The system component that was exploited (e.g. "refund tool").
-        signals: Observable cues that indicated success or failure (e.g. "agent revealed address").
+        reflection: Tactical feedback from the reflector explaining how/why the attack played out.
         round_number: Which arena round this entry was produced in.
         trace_id: Identifier of the conversation trace this entry corresponds to.
     """
@@ -25,7 +41,7 @@ class AttackMemoryEntry(BaseModel):
     success: bool
     violated_rule: str | None = None
     affected_component: str | None = None
-    signals: list[str] = Field(default_factory=list)
+    reflection: TacticalReflection | None = None
     round_number: int
     trace_id: str
 
@@ -39,7 +55,7 @@ class StrategySummary(BaseModel):
         failure_count: Number of failed attempts.
         success_rate: Successful attempts divided by total attempts.
         last_violated_rules: Recent violated rules recorded for successful attempts.
-        last_signals: Signals from the most recent attempt.
+        last_reflection: Tactical reflection from the most recent attempt.
     """
 
     strategy_name: str
@@ -47,7 +63,7 @@ class StrategySummary(BaseModel):
     failure_count: int = 0
     success_rate: float = 0.0
     last_violated_rules: list[str] = Field(default_factory=list)
-    last_signals: list[str] = Field(default_factory=list)
+    last_reflection: TacticalReflection | None = None
 
 
 class AttackMemory:
@@ -104,7 +120,7 @@ class AttackMemory:
 
             if entry.violated_rule is not None:
                 summary.last_violated_rules = [entry.violated_rule]
-            summary.last_signals = list(entry.signals)
+            summary.last_reflection = entry.reflection
 
         for summary in summaries.values():
             total_count = summary.success_count + summary.failure_count

@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from attack_agent.src.memory import TacticalReflection
 from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EVENTS_FILENAME
+from common.src.models import EvaluationVerdict, Trace
 from runner.src import __main__ as runner_main
 from runner.src.simple_evaluator import HeuristicEvaluator
 from shielded_system.src.models import ChatMessage
@@ -41,6 +43,23 @@ class FakeAttackAgent:
         return f"attack from {name}"
 
 
+class FakeReflector:
+    """Reflector double that returns a fixed reflection without LLM calls."""
+
+    async def reflect(self, trace: Trace, verdict: EvaluationVerdict) -> TacticalReflection:
+        """Return a deterministic reflection.
+
+        Args:
+            trace: Trace submitted for reflection.
+            verdict: Evaluation verdict.
+        """
+        return TacticalReflection(
+            tactic_used="test tactic",
+            why_outcome="test outcome",
+            suggested_mutations=["try something else"],
+        )
+
+
 def _read_events(events_dir: Path) -> list[dict]:
     """Read all events from the latest run directory."""
     events_path = events_dir / "latest" / EVENTS_FILENAME
@@ -58,6 +77,7 @@ class TestMain:
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
             patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
+            patch("runner.src.runner.TacticalReflector", lambda: FakeReflector()),
         ):
             runner_main.main(
                 events_dir=events_dir,
@@ -88,6 +108,7 @@ class TestMain:
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
             patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
+            patch("runner.src.runner.TacticalReflector", lambda: FakeReflector()),
         ):
             runner_main.main(
                 events_dir=events_dir,
@@ -122,6 +143,7 @@ class TestMain:
             patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
             patch("runner.src.runner.AttackAgent", FakeAttackAgent),
             patch("runner.src.__main__.Evaluator", HeuristicEvaluator),
+            patch("runner.src.runner.TacticalReflector", lambda: FakeReflector()),
         ):
             runner_main.main(
                 events_dir=events_dir,

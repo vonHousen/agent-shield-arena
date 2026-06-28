@@ -20,6 +20,11 @@ class Settings(BaseSettings):
 
     arena_rounds: int = Field(default=3, description="Number of arena rounds in a multi-round session")
 
+    mutate_successful_attacks: bool = Field(
+        default=False,
+        description="When False, successful attacks are repeated as-is; when True, suggested mutations are applied.",
+    )
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 

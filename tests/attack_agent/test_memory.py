@@ -4,10 +4,52 @@ from pathlib import Path
 
 import pytest
 
-from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry, TacticalReflection
 
 FIRST_ROUND = 1
 SECOND_ROUND = 2
+
+
+def _sample_reflection(
+    tactic: str = "asked about refund limit",
+    why: str = "agent treated it as FAQ",
+    trigger: str | None = None,
+    mutations: list[str] | None = None,
+) -> TacticalReflection:
+    return TacticalReflection(
+        tactic_used=tactic,
+        why_outcome=why,
+        defensive_trigger=trigger,
+        suggested_mutations=mutations or ["try a different angle"],
+    )
+
+
+class TestTacticalReflection:
+    def test_when_constructed_expect_all_fields_populated(self) -> None:
+        # act
+        reflection = TacticalReflection(
+            tactic_used="claimed to be family member",
+            why_outcome="agent refused third-party access",
+            defensive_trigger="identity verification check",
+            suggested_mutations=["start as verified customer then switch IDs"],
+        )
+
+        # assert
+        assert reflection.tactic_used == "claimed to be family member"
+        assert reflection.why_outcome == "agent refused third-party access"
+        assert reflection.defensive_trigger == "identity verification check"
+        assert reflection.suggested_mutations == ["start as verified customer then switch IDs"]
+
+    def test_when_optional_fields_omitted_expect_defaults(self) -> None:
+        # act
+        reflection = TacticalReflection(
+            tactic_used="asked a question",
+            why_outcome="it worked",
+        )
+
+        # assert
+        assert reflection.defensive_trigger is None
+        assert reflection.suggested_mutations == []
 
 
 class TestAttackMemoryEntry:
@@ -24,14 +66,20 @@ class TestAttackMemoryEntry:
         assert entry.entry_id
         assert len(entry.entry_id) == 32
 
-    def test_when_success_expect_violation_fields_populated(self) -> None:
-        # arrange / act
+    def test_when_success_with_reflection_expect_fields_populated(self) -> None:
+        # arrange
+        reflection = _sample_reflection(
+            tactic="split $180 into two $90 requests",
+            why="each request was below $100 threshold",
+        )
+
+        # act
         entry = AttackMemoryEntry(
             strategy_name="split-refund",
             success=True,
             violated_rule="Refunds above $100 require manager approval",
             affected_component="process_refund",
-            signals=["agent processed $90 refund", "repeated refund accepted"],
+            reflection=reflection,
             round_number=1,
             trace_id="trace-1",
         )
@@ -40,14 +88,15 @@ class TestAttackMemoryEntry:
         assert entry.success is True
         assert entry.violated_rule == "Refunds above $100 require manager approval"
         assert entry.affected_component == "process_refund"
-        assert len(entry.signals) == 2
+        assert entry.reflection is not None
+        assert entry.reflection.tactic_used == "split $180 into two $90 requests"
 
     def test_when_failure_expect_optional_fields_none(self) -> None:
         # act
         entry = AttackMemoryEntry(
             strategy_name="identity-spoofing",
             success=False,
-            signals=["agent refused identity claim"],
+            reflection=_sample_reflection(trigger="identity check"),
             round_number=1,
             trace_id="trace-2",
         )
@@ -56,9 +105,9 @@ class TestAttackMemoryEntry:
         assert entry.success is False
         assert entry.violated_rule is None
         assert entry.affected_component is None
-        assert len(entry.signals) == 1
+        assert entry.reflection is not None
 
-    def test_when_no_signals_provided_expect_empty_list(self) -> None:
+    def test_when_no_reflection_provided_expect_none(self) -> None:
         # act
         entry = AttackMemoryEntry(
             strategy_name="prompt-extraction",
@@ -68,17 +117,21 @@ class TestAttackMemoryEntry:
         )
 
         # assert
-        assert entry.signals == []
+        assert entry.reflection is None
 
     def test_when_serialized_expect_valid_json_roundtrip(self) -> None:
         # arrange
+        reflection = _sample_reflection(
+            tactic="asked about address verification",
+            why="agent revealed current address during verification",
+        )
         entry = AttackMemoryEntry(
             entry_id="entry-1",
             strategy_name="social-engineering",
             success=True,
             violated_rule="Verify address before changes",
             affected_component="update_shipping_address",
-            signals=["agent revealed current address"],
+            reflection=reflection,
             round_number=1,
             trace_id="trace-4",
         )
@@ -91,7 +144,8 @@ class TestAttackMemoryEntry:
         assert restored.entry_id == "entry-1"
         assert restored.strategy_name == "social-engineering"
         assert restored.success is True
-        assert restored.signals == ["agent revealed current address"]
+        assert restored.reflection is not None
+        assert restored.reflection.tactic_used == "asked about address verification"
 
 
 class TestAttackMemoryAppend:
@@ -104,7 +158,7 @@ class TestAttackMemoryAppend:
             success=True,
             violated_rule="Refunds above $100 require manager approval",
             affected_component="process_refund",
-            signals=["processed repeated $90 refunds"],
+            reflection=_sample_reflection(),
             round_number=FIRST_ROUND,
             trace_id="trace-1",
         )
@@ -136,7 +190,7 @@ class TestAttackMemoryLoadAll:
             entry_id="entry-1",
             strategy_name="prompt-extraction",
             success=False,
-            signals=["agent refused to reveal policies"],
+            reflection=_sample_reflection(trigger="policy disclosure check"),
             round_number=FIRST_ROUND,
             trace_id="trace-1",
         )
@@ -177,15 +231,24 @@ class TestAttackMemoryGetByStrategy:
 
 
 class TestAttackMemorySummary:
-    def test_when_entries_exist_expect_per_strategy_counts_and_recent_context(self, tmp_path: Path) -> None:
+    def test_when_entries_exist_expect_per_strategy_counts_and_recent_reflection(self, tmp_path: Path) -> None:
         # arrange
         memory = AttackMemory(memory_path=tmp_path / "attack_memory.jsonl")
+        round1_reflection = _sample_reflection(
+            tactic="split large refund into two",
+            why="each was below threshold",
+        )
+        round2_reflection = _sample_reflection(
+            tactic="asked for another refund on same order",
+            why="manager approval was required",
+            trigger="refund limit enforcement",
+        )
         memory.append(
             AttackMemoryEntry(
                 strategy_name="split-refund",
                 success=True,
                 violated_rule="Refunds above $100 require manager approval",
-                signals=["processed repeated $90 refunds"],
+                reflection=round1_reflection,
                 round_number=FIRST_ROUND,
                 trace_id="trace-1",
             )
@@ -194,7 +257,7 @@ class TestAttackMemorySummary:
             AttackMemoryEntry(
                 strategy_name="split-refund",
                 success=False,
-                signals=["manager approval required"],
+                reflection=round2_reflection,
                 round_number=SECOND_ROUND,
                 trace_id="trace-2",
             )
@@ -209,4 +272,4 @@ class TestAttackMemorySummary:
         assert split_refund.failure_count == 1
         assert split_refund.success_rate == pytest.approx(0.5)
         assert split_refund.last_violated_rules == ["Refunds above $100 require manager approval"]
-        assert split_refund.last_signals == ["manager approval required"]
+        assert split_refund.last_reflection == round2_reflection

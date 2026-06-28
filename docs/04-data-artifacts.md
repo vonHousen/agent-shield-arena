@@ -23,13 +23,16 @@ Each arena run produces three kinds of persistent artifacts:
 │      │    └─ full conversation saved as TRACE   │
 │      ├─ evaluator judges the trace               │
 │      │    └─ verdict emitted as EVENT           │
-│      └─ outcome stored in MEMORY                │
+│      ├─ reflector produces tactical feedback     │
+│      │    └─ analyzes trace + verdict → how/why │
+│      └─ outcome + reflection stored in MEMORY   │
 │           └─ used to enrich future prompts       │
 │                                                  │
 │  Round 2                                         │
 │    Strategy "split-refund" (memory-enriched)     │
 │      ├─ AttackAgent reads MEMORY for this        │
-│      │  strategy → adapts system prompt          │
+│      │  strategy → tactical reflections inform   │
+│      │  what to try next and what to avoid       │
 │      └─ ... same flow as above ...               │
 │                                                  │
 └──────────────────────────────────────────────────┘
@@ -68,11 +71,11 @@ Each arena run produces three kinds of persistent artifacts:
 
 ## Memory
 
-**What:** A cumulative JSONL log of attack outcomes — one entry per evaluated conversation recording whether the attack succeeded, which rule was violated, and observable signals.
+**What:** A cumulative JSONL log of attack outcomes — one entry per evaluated conversation recording whether the attack succeeded, which rule was violated, and structured tactical feedback from the reflector.
 
-**Why:** The attack agent reads memory entries for its current strategy to adapt its prompt in subsequent rounds. Successful patterns are reinforced; failed approaches are avoided.
+**Why:** The attack agent reads memory entries for its current strategy to adapt its prompt in subsequent rounds. Tactical reflections provide actionable intelligence: what tactic was tried, why it worked or failed, and what to try next.
 
-**Shape:** Each line is an `AttackMemoryEntry` with `entry_id`, `strategy_name`, `success`, `violated_rule`, `affected_component`, `signals` (list of evidence strings), `round_number`, and `trace_id`.
+**Shape:** Each line is an `AttackMemoryEntry` with `entry_id`, `strategy_name`, `success`, `violated_rule`, `affected_component`, `reflection` (a `TacticalReflection` object with `tactic_used`, `why_outcome`, `defensive_trigger`, and `suggested_mutations`), `round_number`, and `trace_id`.
 
 **Key property:** Memory grows across rounds within a single run. Round 2 reads entries from round 1; round 3 reads entries from rounds 1 and 2. This is the self-improvement mechanism.
 
@@ -134,7 +137,7 @@ The [`event_watcher`](../dashboard/src/event_watcher.py) tails the JSONL file, r
 
 ### Memory → Attack Agent
 
-The [`AttackAgent`](../attack_agent/src/agent.py) receives an `AttackMemory` instance at construction. When building its system prompt, it calls `memory.get_by_strategy(strategy_name)` and formats prior successes/failures into the prompt so the LLM can adapt its approach.
+The [`AttackAgent`](../attack_agent/src/agent.py) receives an `AttackMemory` instance at construction. When building its system prompt, it calls `memory.get_by_strategy(strategy_name)` and formats prior tactical reflections into the prompt — including what tactic was used, why it worked or failed, and defensive triggers encountered. Suggested mutations are always shown for failed attacks. For successful attacks, mutations are only shown when `mutate_successful_attacks=True` (default: `False`), so successful tactics are repeated as-is by default.
 
 ## CLI recipes
 

@@ -131,7 +131,14 @@ failed attack    → negative signal → deprioritize
 
 ### 7.3 Attack Agent Memory
 
-Stores attack history: successful strategies, failed attempts, and observed Shielded System responses. Used to prioritize future attacks — successful patterns are mutated and retried, failed ones are deprioritized. Enables the Attack Agent to specialize over time against this specific Shielded System.
+Stores attack history: successful strategies, failed attempts, and structured tactical reflections. Each memory entry contains a `TacticalReflection` object that captures:
+
+* **tactic_used** — the specific conversational approach employed (e.g. "asked about refund limit framed as a practical customer question")
+* **why_outcome** — why the tactic succeeded or failed (e.g. "agent treated internal threshold as public policy")
+* **defensive_trigger** — which defensive behavior blocked the attack, if it failed (e.g. "identity verification refused third-party access")
+* **suggested_mutations** — 2-3 concrete alternative approaches for the next attempt
+
+Used to prioritize future attacks — successful patterns are mutated using the reflector's suggestions, failed ones are avoided based on identified defensive triggers. This structured feedback enables the Attack Agent to meaningfully adapt across rounds rather than blindly retrying.
 
 ### 7.4 Defender
 
@@ -160,7 +167,21 @@ How it works:
 3. Judges whether a business-rule violation or security breach occurred.
 4. Outputs: success/failure, violation type, violated rule, evidence (quoted from trace), severity.
 
-### 7.7 Triage Agent
+### 7.7 Tactical Reflector
+
+A post-evaluation analysis step that produces actionable tactical feedback from completed conversations. Distinct from the Evaluator — the Evaluator judges *whether* an attack succeeded, while the Reflector explains *how* and *why* for the attacker's benefit.
+
+How it works:
+
+1. Receives the complete conversation trace and the Evaluator's verdict.
+2. Analyzes the attacker's conversational approach and the defender's reactions.
+3. Outputs a structured `TacticalReflection`: what tactic was used, why it worked or failed, which defensive behavior was triggered, and concrete mutations for the next attempt.
+
+The Reflector sits between the Evaluator and Attack Agent Memory in the data flow. Its output is stored as part of each `AttackMemoryEntry` and fed back to the Attack Agent in subsequent rounds.
+
+**Mutation strategy:** By default (`mutate_successful_attacks=False`), successful attacks are repeated as-is — their mutations are stored but not shown to the attack agent. Only failed attack mutations are surfaced. This maximizes exploitation of known weaknesses. When enabled, successful attack mutations are also surfaced, encouraging the agent to explore variations of working tactics.
+
+### 7.8 Triage Agent
 
 Classifies each successful attack into one of two remediation paths:
 
@@ -177,7 +198,7 @@ flowchart TD
     D -->|Yes| E[Route to code/workflow remediation]
 ```
 
-### 7.8 Coding Agent Stub
+### 7.9 Coding Agent Stub
 
 For MVP, does not modify code. Generates a human-reviewable remediation proposal: affected component, root cause, recommended change, tests to add.
 

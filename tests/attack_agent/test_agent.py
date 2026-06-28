@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from attack_agent.src.agent import AttackAgent
-from attack_agent.src.memory import AttackMemory, AttackMemoryEntry
+from attack_agent.src.memory import AttackMemory, AttackMemoryEntry, TacticalReflection
 from attack_agent.src.strategies import AttackStrategy, RoundRobinStrategySelector
 from shielded_system.src.models import ChatMessage, ChatRole
 
@@ -148,7 +148,12 @@ class TestAttackAgentGenerateAttack:
             AttackMemoryEntry(
                 strategy_name="identity-spoofing",
                 success=False,
-                signals=["agent refused the on behalf of family member claim"],
+                reflection=TacticalReflection(
+                    tactic_used="claimed to be family member",
+                    why_outcome="agent refused third-party access",
+                    defensive_trigger="identity verification check",
+                    suggested_mutations=["start as verified customer then switch IDs"],
+                ),
                 round_number=FIRST_ROUND,
                 trace_id="trace-1",
             )
@@ -164,8 +169,9 @@ class TestAttackAgentGenerateAttack:
         assert result == attack_message
         assert "Previous attempts with this strategy:" in system_prompt
         assert "Failures:" in system_prompt
-        assert "agent refused the on behalf of family member claim" in system_prompt
-        assert "Adapt your approach: mutate successful patterns, avoid known failures." in system_prompt
+        assert "claimed to be family member" in system_prompt
+        assert "identity verification check" in system_prompt
+        assert "start as verified customer then switch IDs" in system_prompt
 
 
 def _completion(content: str) -> dict[str, Any]:
