@@ -171,6 +171,8 @@ class Defender:
             reason=decision.reason,
             matched_patterns=decision.matched_pattern_ids,
             confidence=decision.confidence,
+            tool_name=tool_name,
+            tool_arguments=arguments,
         )
 
     def _format_memory_context(self) -> str:

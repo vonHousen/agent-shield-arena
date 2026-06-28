@@ -644,7 +644,7 @@ function appendDefenderDecision(payload) {
 
   const checkpoint = document.createElement("span");
   checkpoint.className = "defender-checkpoint";
-  checkpoint.textContent = formatCheckpoint(payload.checkpoint);
+  checkpoint.textContent = formatCheckpoint(payload.checkpoint, payload.tool_name);
 
   summary.append(badge, checkpoint);
 
@@ -653,6 +653,13 @@ function appendDefenderDecision(payload) {
   reason.textContent = payload.reason;
 
   details.append(summary, reason);
+
+  if (payload.tool_arguments) {
+    const argsEl = document.createElement("pre");
+    argsEl.className = "tool-code";
+    argsEl.textContent = JSON.stringify(payload.tool_arguments, null, 2);
+    details.append(argsEl);
+  }
 
   const matchedPatterns = payload.matched_patterns || [];
   if (matchedPatterns.length > 0) {
@@ -816,13 +823,13 @@ function humanizeName(snakeName) {
     .join(" ");
 }
 
-function formatCheckpoint(checkpoint) {
+function formatCheckpoint(checkpoint, toolName) {
   if (checkpoint === "on_user_input") {
     return "Input checkpoint";
   }
 
   if (checkpoint === "on_tool_call") {
-    return "Tool-call checkpoint";
+    return toolName ? `Tool-call checkpoint: ${toolName}` : "Tool-call checkpoint";
   }
 
   return checkpoint;

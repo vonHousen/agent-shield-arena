@@ -207,6 +207,8 @@ class DefenderDecision(BaseModel):
         reason: Human-readable explanation of the decision.
         matched_patterns: Memory pattern IDs that triggered the decision (empty when no memory).
         confidence: Optional LLM confidence score for the decision.
+        tool_name: Name of the evaluated tool (only for on_tool_call checkpoint).
+        tool_arguments: Arguments of the evaluated tool call (only for on_tool_call checkpoint).
     """
 
     decision_id: str = Field(default_factory=lambda: uuid4().hex)
@@ -215,6 +217,8 @@ class DefenderDecision(BaseModel):
     reason: str
     matched_patterns: list[str] = Field(default_factory=list)
     confidence: float | None = None
+    tool_name: str | None = None
+    tool_arguments: dict[str, Any] | None = None
 
 
 class TriageDecision(BaseModel):
