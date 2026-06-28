@@ -1,6 +1,6 @@
 """Tests for dashboard mock event production."""
 
-from common.src.models import ArenaEvent, EvaluationVerdict, EventType, RoundStarted
+from common.src.models import ArenaEvent, DefenderDecision, EvaluationVerdict, EventType, RoundStarted
 from dashboard.src.mock_event_producer import _build_mock_events
 
 
@@ -26,6 +26,20 @@ class TestBuildMockEvents:
         assert round_payloads[1].round_number == 2
         assert round_payloads[1].strategy_count == 2
         assert {payload.success for payload in verdict_payloads} == {True, False}
+
+    def test_when_built_expect_defender_decisions_for_dashboard(self) -> None:
+        # arrange
+        expected_decisions = {"BLOCK", "ALLOW"}
+
+        # act
+        events = _build_mock_events()
+
+        # assert
+        defender_events = _filter_events(events, EventType.DEFENDER_DECISION)
+        defender_payloads = [event.payload for event in defender_events if isinstance(event.payload, DefenderDecision)]
+
+        assert defender_payloads
+        assert {payload.decision for payload in defender_payloads} == expected_decisions
 
 
 def _filter_events(events: list[ArenaEvent], event_type: EventType) -> list[ArenaEvent]:

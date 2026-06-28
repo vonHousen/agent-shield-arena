@@ -15,6 +15,8 @@ const state = {
   scenarios: 0,
   verdicts: 0,
   successfulVerdicts: 0,
+  defenderDecisions: 0,
+  defenderBlocks: 0,
   scenarioMetadata: {},
   scenarioMetrics: {
     [ALL_FILTER]: { messages: 0, toolCalls: 0, toolResults: 0 },
@@ -40,6 +42,8 @@ const elements = {
   messageMetric: document.querySelector("#messageMetric"),
   toolCallMetric: document.querySelector("#toolCallMetric"),
   successRateMetric: document.querySelector("#successRateMetric"),
+  blockMetric: document.querySelector("#blockMetric"),
+  blockRateMetric: document.querySelector("#blockRateMetric"),
   verdictCard: document.querySelector("#verdictCard"),
   runSelector: document.querySelector("#runSelector"),
   roundComparisonCard: document.querySelector("#roundComparisonCard"),
@@ -378,9 +382,23 @@ function handleConversationEvent(event) {
     return;
   }
 
+  if (event.event_type === "defender_decision") {
+    handleDefenderDecision(event);
+    return;
+  }
+
   if (event.event_type === "evaluation_verdict") {
     handleEvaluationVerdict(event);
   }
+}
+
+function handleDefenderDecision(event) {
+  state.defenderDecisions += 1;
+  if (event.payload.decision === "BLOCK") {
+    state.defenderBlocks += 1;
+  }
+
+  renderIfVisible(event, appendDefenderDecision);
 }
 
 function handleEvaluationVerdict(event) {
@@ -532,6 +550,8 @@ function rerenderConversation() {
       appendToolCall(event.payload);
     } else if (event.event_type === "tool_result") {
       appendToolResult(event.payload);
+    } else if (event.event_type === "defender_decision") {
+      appendDefenderDecision(event.payload);
     }
   }
 
@@ -606,6 +626,63 @@ function appendToolResult(payload) {
   appendConversationNode(row);
 }
 
+function appendDefenderDecision(payload) {
+  const isBlock = payload.decision === "BLOCK";
+  const row = document.createElement("div");
+  row.className = "message-row message-row-right";
+
+  const details = document.createElement("details");
+  details.className = isBlock ? "defender-card defender-card-block" : "defender-card defender-card-allow";
+  details.open = isBlock;
+
+  const summary = document.createElement("summary");
+  summary.className = "defender-summary";
+
+  const badge = document.createElement("span");
+  badge.className = isBlock ? "defender-badge defender-badge-block" : "defender-badge defender-badge-allow";
+  badge.textContent = isBlock ? "BLOCKED" : "ALLOWED";
+
+  const checkpoint = document.createElement("span");
+  checkpoint.className = "defender-checkpoint";
+  checkpoint.textContent = formatCheckpoint(payload.checkpoint);
+
+  summary.append(badge, checkpoint);
+
+  const reason = document.createElement("p");
+  reason.className = "defender-reason";
+  reason.textContent = payload.reason;
+
+  details.append(summary, reason);
+
+  const matchedPatterns = payload.matched_patterns || [];
+  if (matchedPatterns.length > 0) {
+    details.append(createDefenderDetail("Matched", matchedPatterns.join(", ")));
+  }
+
+  if (payload.confidence !== null && payload.confidence !== undefined) {
+    const confidence = `${Math.round(payload.confidence * 100)}%`;
+    details.append(createDefenderDetail("Confidence", confidence));
+  }
+
+  row.append(details);
+  appendConversationNode(row);
+}
+
+function createDefenderDetail(label, value) {
+  const row = document.createElement("p");
+  row.className = "defender-detail";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "defender-detail-label";
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement("span");
+  valueEl.textContent = value;
+
+  row.append(labelEl, valueEl);
+  return row;
+}
+
 function appendConversationNode(node) {
   if (state.scenarioEmptyPlaceholder) {
     state.scenarioEmptyPlaceholder.remove();
@@ -625,6 +702,8 @@ function appendConversationNode(node) {
 function updateMetrics() {
   const defended = state.verdicts - state.successfulVerdicts;
   const defenseRate = state.verdicts === 0 ? 0 : Math.round((defended / state.verdicts) * 100);
+  const blockRate =
+    state.defenderDecisions === 0 ? 0 : Math.round((state.defenderBlocks / state.defenderDecisions) * 100);
   const metrics = state.scenarioMetrics[ALL_FILTER];
 
   elements.roundMetric.textContent = state.rounds.length;
@@ -632,6 +711,8 @@ function updateMetrics() {
   elements.messageMetric.textContent = metrics.messages;
   elements.toolCallMetric.textContent = metrics.toolCalls;
   elements.successRateMetric.textContent = `${defenseRate}%`;
+  elements.blockMetric.textContent = state.defenderBlocks;
+  elements.blockRateMetric.textContent = `${blockRate}%`;
 }
 
 function updateHeaderSummary() {
@@ -678,6 +759,8 @@ function resetState() {
   state.scenarios = 0;
   state.verdicts = 0;
   state.successfulVerdicts = 0;
+  state.defenderDecisions = 0;
+  state.defenderBlocks = 0;
   state.currentScenario = null;
   state.currentRoundFilter = null;
   state.currentRoundNumber = null;
@@ -731,6 +814,18 @@ function humanizeName(snakeName) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatCheckpoint(checkpoint) {
+  if (checkpoint === "on_user_input") {
+    return "Input checkpoint";
+  }
+
+  if (checkpoint === "on_tool_call") {
+    return "Tool-call checkpoint";
+  }
+
+  return checkpoint;
 }
 
 function buildScenarioKey(roundNumber, scenarioName) {
