@@ -3,6 +3,8 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from shielded_system.src.models import ChatMessage, ChatRole
+
 ConversationHistory = list[tuple[str, str]]
 
 
@@ -20,11 +22,11 @@ class AttackSource(Protocol):
 class AttackAgent(Protocol):
     """Minimal attack-agent interface wrapped by LLMAttackSource."""
 
-    async def generate_attack(self, conversation_history: ConversationHistory) -> str | None:
+    async def generate_attack(self, conversation_history: list[ChatMessage]) -> str | None:
         """Generate the next attack message, or None to stop.
 
         Args:
-            conversation_history: Conversation turns collected so far as role/content tuples.
+            conversation_history: Conversation turns converted to shielded-system chat messages.
         """
 
 
@@ -45,7 +47,7 @@ class LLMAttackSource:
         Args:
             history: Conversation turns collected so far as role/content tuples.
         """
-        return await self._attack_agent.generate_attack(history)
+        return await self._attack_agent.generate_attack(_to_chat_messages(history))
 
 
 class MockAttackSource:
@@ -72,3 +74,7 @@ class MockAttackSource:
         message = self._messages[self._index]
         self._index += 1
         return message
+
+
+def _to_chat_messages(history: ConversationHistory) -> list[ChatMessage]:
+    return [ChatMessage(role=ChatRole(role), content=content) for role, content in history]
