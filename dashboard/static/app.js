@@ -12,6 +12,7 @@ const state = {
   lastRenderedRound: null,
 
   rounds: [],
+  roundVerdicts: {},
   scenarios: 0,
   verdicts: 0,
   successfulVerdicts: 0,
@@ -40,6 +41,8 @@ const elements = {
   latestType: document.querySelector("#latestType"),
   latestTimestamp: document.querySelector("#latestTimestamp"),
   runSelector: document.querySelector("#runSelector"),
+  roundComparisonCard: document.querySelector("#roundComparisonCard"),
+  roundComparison: document.querySelector("#roundComparison"),
 };
 
 elements.scrollButton.addEventListener("click", () => {
@@ -189,6 +192,7 @@ function handleRoundStarted(payload) {
 
   if (!state.rounds.includes(payload.round_number)) {
     state.rounds.push(payload.round_number);
+    state.roundVerdicts[payload.round_number] = { pass: 0, fail: 0, total: payload.strategy_count };
     addRoundButton(payload.round_number);
   }
 }
@@ -198,8 +202,99 @@ function addRoundButton(roundNumber) {
   button.className = "round-button";
   button.type = "button";
   button.dataset.round = String(roundNumber);
-  button.textContent = `Round ${roundNumber}`;
+
+  const dot = document.createElement("span");
+  dot.className = "round-dot round-dot-running";
+
+  const label = document.createElement("span");
+  label.className = "round-label";
+  label.textContent = `Round ${roundNumber}`;
+
+  button.append(dot, label);
   elements.roundSelector.append(button);
+}
+
+function updateRoundButtonLabel(roundNumber) {
+  const button = elements.roundSelector.querySelector(`[data-round="${roundNumber}"]`);
+  if (!button) {
+    return;
+  }
+
+  const rv = state.roundVerdicts[roundNumber];
+  const evaluated = rv.pass + rv.fail;
+
+  const label = button.querySelector(".round-label");
+  if (label) {
+    label.textContent = `Round ${roundNumber} (${rv.pass}/${evaluated})`;
+  }
+
+  const dot = button.querySelector(".round-dot");
+  if (dot) {
+    dot.className = "round-dot";
+    if (evaluated >= rv.total) {
+      dot.classList.add(rv.fail === 0 ? "round-dot-pass" : "round-dot-fail");
+    } else {
+      dot.classList.add("round-dot-running");
+    }
+  }
+}
+
+function updateRoundComparison() {
+  const container = elements.roundComparison;
+  container.innerHTML = "";
+
+  const hasVerdicts = state.rounds.some((r) => {
+    const rv = state.roundVerdicts[r];
+    return rv && rv.pass + rv.fail > 0;
+  });
+
+  if (!hasVerdicts) {
+    elements.roundComparisonCard.classList.add("hidden");
+    return;
+  }
+
+  elements.roundComparisonCard.classList.remove("hidden");
+
+  for (const roundNumber of state.rounds) {
+    const rv = state.roundVerdicts[roundNumber];
+    if (!rv) {
+      continue;
+    }
+
+    const evaluated = rv.pass + rv.fail;
+    if (evaluated === 0) {
+      continue;
+    }
+
+    const passPercent = Math.round((rv.pass / evaluated) * 100);
+
+    const row = document.createElement("div");
+    row.className = "comparison-row";
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "comparison-label";
+    labelEl.textContent = `Round ${roundNumber}`;
+
+    const barTrack = document.createElement("div");
+    barTrack.className = "comparison-track";
+
+    const barFill = document.createElement("div");
+    barFill.className = "comparison-bar";
+    barFill.style.width = `${passPercent}%`;
+
+    if (evaluated < rv.total) {
+      barFill.classList.add("comparison-bar-running");
+    }
+
+    barTrack.append(barFill);
+
+    const countEl = document.createElement("span");
+    countEl.className = "comparison-count";
+    countEl.textContent = `${rv.pass}/${evaluated} passed`;
+
+    row.append(labelEl, barTrack, countEl);
+    container.append(row);
+  }
 }
 
 function handleScenarioStarted(payload) {
@@ -224,7 +319,8 @@ function handleScenarioStarted(payload) {
   tab.dataset.round = roundNumber === null ? "" : String(roundNumber);
 
   const label = document.createElement("span");
-  label.textContent = humanizeName(payload.scenario_name);
+  const prefix = roundNumber !== null ? `R${roundNumber}: ` : "";
+  label.textContent = prefix + humanizeName(payload.scenario_name);
   tab.append(label);
   elements.scenarioTabs.append(tab);
 
@@ -267,6 +363,17 @@ function handleEvaluationVerdict(event) {
   state.verdicts += 1;
   if (event.payload.success) {
     state.successfulVerdicts += 1;
+  }
+
+  if (event.roundNumber !== null && state.roundVerdicts[event.roundNumber]) {
+    const rv = state.roundVerdicts[event.roundNumber];
+    if (event.payload.success) {
+      rv.pass += 1;
+    } else {
+      rv.fail += 1;
+    }
+    updateRoundButtonLabel(event.roundNumber);
+    updateRoundComparison();
   }
 
   if (state.activeScenarioKey) {
@@ -316,6 +423,7 @@ function switchRound(roundFilter) {
 
   updateActiveScenarioTab();
   rerenderConversation();
+  updateMetrics();
 }
 
 function switchTab(scenarioKey) {
@@ -413,7 +521,21 @@ function filteredEventsForCurrentView() {
 function appendRoundHeader(roundNumber) {
   const header = document.createElement("div");
   header.className = "round-header";
-  header.textContent = roundNumber === null ? "No round" : `Round ${roundNumber}`;
+
+  if (roundNumber === null) {
+    header.textContent = "No round";
+  } else {
+    let text = `Round ${roundNumber}`;
+    const rv = state.roundVerdicts[roundNumber];
+    if (rv) {
+      const evaluated = rv.pass + rv.fail;
+      if (evaluated > 0) {
+        text += ` \u2014 ${rv.pass}/${evaluated} passed`;
+      }
+    }
+    header.textContent = text;
+  }
+
   appendConversationNode(header);
 }
 
@@ -515,6 +637,21 @@ function appendConversationNode(node) {
 }
 
 function updateMetrics() {
+  if (state.currentRoundFilter !== ALL_FILTER) {
+    const roundNum = parseInt(state.currentRoundFilter, 10);
+    const roundMetrics = aggregateRoundMetrics(roundNum);
+    const rv = state.roundVerdicts[roundNum];
+    const evaluated = rv ? rv.pass + rv.fail : 0;
+    const successRate = evaluated === 0 ? 0 : Math.round((rv.pass / evaluated) * 100);
+
+    elements.roundMetric.textContent = `${roundNum}`;
+    elements.scenarioMetric.textContent = roundMetrics.scenarios;
+    elements.messageMetric.textContent = roundMetrics.messages;
+    elements.toolCallMetric.textContent = roundMetrics.toolCalls;
+    elements.successRateMetric.textContent = `${successRate}%`;
+    return;
+  }
+
   const metrics = state.scenarioMetrics[ALL_FILTER];
   const successRate = state.verdicts === 0 ? 0 : Math.round((state.successfulVerdicts / state.verdicts) * 100);
 
@@ -523,6 +660,25 @@ function updateMetrics() {
   elements.messageMetric.textContent = metrics.messages;
   elements.toolCallMetric.textContent = metrics.toolCalls;
   elements.successRateMetric.textContent = `${successRate}%`;
+}
+
+function aggregateRoundMetrics(roundNumber) {
+  let messages = 0;
+  let toolCalls = 0;
+  let scenarios = 0;
+
+  for (const [key, meta] of Object.entries(state.scenarioMetadata)) {
+    if (meta.roundNumber === roundNumber) {
+      scenarios += 1;
+      const m = state.scenarioMetrics[key];
+      if (m) {
+        messages += m.messages;
+        toolCalls += m.toolCalls;
+      }
+    }
+  }
+
+  return { scenarios, messages, toolCalls };
 }
 
 function setStatus(label, status) {
@@ -552,6 +708,7 @@ function resetState() {
   state.currentRoundNumber = null;
   state.activeScenarioKey = null;
   state.rounds = [];
+  state.roundVerdicts = {};
   state.scenarioEvents = { [ALL_FILTER]: [] };
   state.scenarioEmptyPlaceholder = null;
   state.lastRenderedRound = null;
@@ -568,6 +725,8 @@ function resetState() {
   elements.eventCount.textContent = "0 events";
   elements.latestType.textContent = "None";
   elements.latestTimestamp.textContent = "None";
+  elements.roundComparison.innerHTML = "";
+  elements.roundComparisonCard.classList.add("hidden");
   setStatus("Idle", "idle");
   updateMetrics();
 }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AgentShield Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=3" />
+    <link rel="stylesheet" href="/static/styles.css?v=4" />
   </head>
   <body class="flex h-full flex-col overflow-hidden bg-zinc-950 text-zinc-100">
     <header class="shrink-0 border-b border-zinc-800 bg-zinc-950/95">
@@ -57,7 +57,7 @@
       <aside class="flex min-h-0 flex-col gap-4 overflow-y-auto">
         <section class="shrink-0 border border-zinc-800 bg-zinc-900 p-4">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Arena Progress</h2>
-          <div class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+          <div class="mt-4 grid grid-cols-3 gap-3 text-sm sm:grid-cols-5">
             <div>
               <p class="text-zinc-500">Rounds</p>
               <p id="roundMetric" class="mt-1 text-2xl font-semibold tabular-nums">0</p>
@@ -81,6 +81,11 @@
           </div>
         </section>
 
+        <section id="roundComparisonCard" class="hidden shrink-0 border border-zinc-800 bg-zinc-900 p-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Round Comparison</h2>
+          <div id="roundComparison" class="mt-4 flex flex-col gap-3 text-sm"></div>
+        </section>
+
         <section class="shrink-0 border border-zinc-800 bg-zinc-900 p-4">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-300">Latest Event</h2>
           <dl class="mt-4 grid gap-3 text-sm">
@@ -98,6 +103,6 @@
       </aside>
     </main>
 
-    <script src="/static/app.js?v=3"></script>
+    <script src="/static/app.js?v=4"></script>
   </body>
 </html>

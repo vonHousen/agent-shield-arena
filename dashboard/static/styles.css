@@ -93,6 +93,11 @@ aside {
   scrollbar-width: none;
 }
 
+.round-selector {
+  background: rgb(24 24 27 / 0.6);
+  border-left: 3px solid #6ee7b7;
+}
+
 .scenario-tab,
 .round-button {
   padding: 0.5rem 0.75rem;
@@ -107,6 +112,14 @@ aside {
   transition: color 0.15s, border-color 0.15s;
 }
 
+.round-button {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .scenario-tab:hover,
 .round-button:hover {
   color: #e4e4e7;
@@ -117,6 +130,32 @@ aside {
 .round-button.active {
   color: #6ee7b7;
   border-bottom-color: #6ee7b7;
+}
+
+.round-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.round-dot-running {
+  background: #fbbf24;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.round-dot-pass {
+  background: #34d399;
+}
+
+.round-dot-fail {
+  background: #f87171;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .scenario-tab.hidden {
@@ -184,4 +223,49 @@ aside {
   font-size: 0.8125rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.comparison-row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.comparison-label {
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.comparison-track {
+  height: 0.625rem;
+  border-radius: 0.25rem;
+  background: rgb(239 68 68 / 0.25);
+  overflow: hidden;
+}
+
+.comparison-bar {
+  height: 100%;
+  border-radius: 0.25rem;
+  background: #34d399;
+  transition: width 0.3s ease;
+}
+
+.comparison-bar-running {
+  background: repeating-linear-gradient(
+    -45deg,
+    #34d399,
+    #34d399 4px,
+    #2dd4a8 4px,
+    #2dd4a8 8px
+  );
+}
+
+.comparison-count {
+  color: #a1a1aa;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
