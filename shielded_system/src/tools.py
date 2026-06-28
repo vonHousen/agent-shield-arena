@@ -90,7 +90,9 @@ def lookup_customer(customer_id: str) -> ToolResult:
     Args:
         customer_id: Customer identifier.
     """
-    customer = CUSTOMERS[customer_id]
+    customer = CUSTOMERS.get(customer_id)
+    if customer is None:
+        return {"status": "not_found", "customer_id": customer_id}
     return {"status": "found", "customer": deepcopy(customer)}
 
 
@@ -103,7 +105,9 @@ def process_refund(customer_id: str, order_id: str, amount: float, reason: str) 
         amount: Refund amount in dollars.
         reason: Reason provided by the user.
     """
-    customer = CUSTOMERS[customer_id]
+    customer = CUSTOMERS.get(customer_id)
+    if customer is None:
+        return {"status": "not_found", "customer_id": customer_id}
     if order_id not in customer["order_ids"]:
         return {"status": "rejected", "reason": "order_not_found"}
 
@@ -126,7 +130,9 @@ def update_shipping_address(customer_id: str, new_address: str) -> ToolResult:
         customer_id: Customer identifier.
         new_address: Replacement shipping address.
     """
-    customer = CUSTOMERS[customer_id]
+    customer = CUSTOMERS.get(customer_id)
+    if customer is None:
+        return {"status": "not_found", "customer_id": customer_id}
     customer["shipping_address"] = new_address
     return {"status": "updated", "customer_id": customer_id, "shipping_address": new_address}
 
@@ -143,7 +149,9 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
         "process_refund": process_refund,
         "update_shipping_address": update_shipping_address,
     }
-    tool = tools[tool_name]
+    tool = tools.get(tool_name)
+    if tool is None:
+        return {"status": "error", "reason": f"unknown tool: {tool_name}"}
     return tool(**arguments)
 
 

@@ -2,6 +2,7 @@
 
 from shielded_system.src.tools import (
     REFUND_LIMIT_WITHOUT_MANAGER_APPROVAL,
+    execute_tool,
     lookup_customer,
     process_refund,
     reset_customer_db,
@@ -21,6 +22,16 @@ class TestLookupCustomer:
         assert result["status"] == "found"
         assert result["customer"]["customer_id"] == customer_id
         assert result["customer"]["order_ids"] == ["ord_1001", "ord_1002"]
+
+    def test_when_customer_does_not_exist_expect_not_found(self) -> None:
+        # arrange
+        customer_id = "CUST-99999"
+
+        # act
+        result = lookup_customer(customer_id=customer_id)
+
+        # assert
+        assert result == {"status": "not_found", "customer_id": customer_id}
 
 
 class TestProcessRefund:
@@ -69,6 +80,16 @@ class TestProcessRefund:
         # assert
         assert result == {"status": "rejected", "reason": "order_not_found"}
 
+    def test_when_customer_does_not_exist_expect_not_found(self) -> None:
+        # arrange
+        customer_id = "nonexistent"
+
+        # act
+        result = process_refund(customer_id=customer_id, order_id="ord_1001", amount=25, reason="test")
+
+        # assert
+        assert result == {"status": "not_found", "customer_id": customer_id}
+
 
 class TestUpdateShippingAddress:
     def test_when_customer_exists_expect_address_updated(self) -> None:
@@ -82,3 +103,26 @@ class TestUpdateShippingAddress:
         # assert
         assert result == {"status": "updated", "customer_id": customer_id, "shipping_address": new_address}
         assert lookup_customer(customer_id=customer_id)["customer"]["shipping_address"] == new_address
+
+    def test_when_customer_does_not_exist_expect_not_found(self) -> None:
+        # arrange
+        customer_id = "nonexistent"
+
+        # act
+        result = update_shipping_address(customer_id=customer_id, new_address="123 Fake St")
+
+        # assert
+        assert result == {"status": "not_found", "customer_id": customer_id}
+
+
+class TestExecuteTool:
+    def test_when_tool_name_unknown_expect_error(self) -> None:
+        # arrange
+        tool_name = "hack_the_mainframe"
+
+        # act
+        result = execute_tool(tool_name=tool_name, arguments={})
+
+        # assert
+        assert result["status"] == "error"
+        assert "unknown tool" in result["reason"]
