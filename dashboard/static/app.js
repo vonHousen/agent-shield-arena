@@ -1053,6 +1053,7 @@ function handleDefenderReflection(payload) {
 }
 
 function handleTriageDecision(payload) {
+  payload.scenarioKey = state.activeScenarioKey;
   state.triageDecisions.push(payload);
   renderDefenderAdaptationCard();
 }
@@ -1179,6 +1180,9 @@ function renderDefenderAdaptationCard() {
   }
 
   let visibleTriage = state.triageDecisions;
+  if (state.currentScenario) {
+    visibleTriage = visibleTriage.filter((t) => t.scenarioKey === state.currentScenario);
+  }
   if (state.currentRoundFilter !== null) {
     const maxRound = parseInt(state.currentRoundFilter, 10);
     visibleTriage = visibleTriage.filter((t) => !t.round_number || t.round_number <= maxRound);
