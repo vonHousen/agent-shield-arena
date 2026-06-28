@@ -2,88 +2,99 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
+from attack_agent.src.strategies import AttackStrategy
 from runner.src import __main__ as runner_main
+from shielded_system.src.models import ChatMessage
+
+TWO_TEST_STRATEGIES = [
+    AttackStrategy(name="test-alpha", goal="Alpha goal.", opening="Alpha opening."),
+    AttackStrategy(name="test-beta", goal="Beta goal.", opening="Beta opening."),
+]
 
 
 class FakeAttackAgent:
-    """Attack agent test double for CLI integration tests."""
+    """Attack agent double that emits one message per strategy then stops."""
 
-    def __init__(self) -> None:
-        """Initialize generated message state."""
-        self._messages = ["first generated attack", "second generated attack"]
-        self._index = 0
-
-    async def generate_attack(self, conversation_history: list[object]) -> str | None:
-        """Return generated attack messages and then stop.
+    def __init__(self, strategy: AttackStrategy | None = None, **_kwargs: object) -> None:
+        """Initialize.
 
         Args:
-            conversation_history: Conversation turns observed by the attack agent.
+            strategy: The pinned strategy (used to generate a unique message).
         """
-        if self._index >= len(self._messages):
-            return None
+        self._strategy = strategy
+        self._sent = False
 
-        message = self._messages[self._index]
-        self._index += 1
-        return message
+    async def generate_attack(self, conversation_history: list[ChatMessage]) -> str | None:
+        """Return one message then stop.
+
+        Args:
+            conversation_history: Unused.
+        """
+        if self._sent:
+            return None
+        self._sent = True
+        name = self._strategy.name if self._strategy else "default"
+        return f"attack from {name}"
 
 
 class TestMain:
-    def test_when_mode_omitted_expect_llm_mode_drives_conversation(self, tmp_path: Path, monkeypatch) -> None:
-        """Verify LLM mode is the default runner mode."""
+    def test_when_mode_omitted_expect_llm_mode_runs_all_strategies(self, tmp_path: Path) -> None:
+        """Verify LLM mode is the default and runs one scenario per strategy."""
         # arrange
         events_path = tmp_path / "events.jsonl"
-        monkeypatch.setattr(runner_main, "AttackAgent", FakeAttackAgent)
 
         # act
-        runner_main.main(
-            events_path=events_path,
-            delay=0,
-            mock=True,
-            verbose=False,
-            log_file=tmp_path / "arena.log",
-            scenario="all",
-        )
+        with (
+            patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
+            patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+        ):
+            runner_main.main(
+                events_path=events_path,
+                delay=0,
+                mock=True,
+                verbose=False,
+                log_file=tmp_path / "arena.log",
+                scenario="all",
+            )
+
+        # assert
+        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        assert events[0]["event_type"] == "run_started"
+        assert events[0]["payload"]["scenario_count"] == len(TWO_TEST_STRATEGIES)
+        scenario_names = [e["payload"]["scenario_name"] for e in events if e["event_type"] == "scenario_started"]
+        assert scenario_names == ["test-alpha", "test-beta"]
+        assert events[-1]["event_type"] == "run_completed"
+
+    def test_when_mode_llm_expect_per_strategy_scenarios_with_generated_messages(self, tmp_path: Path) -> None:
+        """Verify LLM mode wires one AttackAgent per strategy into separate conversations."""
+        # arrange
+        events_path = tmp_path / "events.jsonl"
+
+        # act
+        with (
+            patch("runner.src.runner.SEED_STRATEGIES", TWO_TEST_STRATEGIES),
+            patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+        ):
+            runner_main.main(
+                events_path=events_path,
+                delay=0,
+                mock=True,
+                mode="llm",
+                verbose=False,
+                log_file=tmp_path / "arena.log",
+                scenario="all",
+            )
 
         # assert
         events = [json.loads(line) for line in events_path.read_text().splitlines()]
         attacker_messages = [
-            event["payload"]["content"]
-            for event in events
-            if event["event_type"] == "conversation_turn" and event["payload"]["role"] == "user"
+            e["payload"]["content"]
+            for e in events
+            if e["event_type"] == "conversation_turn" and e["payload"]["role"] == "user"
         ]
-        assert events[0]["payload"]["scenario_name"] == "llm_attack"
-        assert attacker_messages == ["first generated attack", "second generated attack"]
-
-    def test_when_mode_llm_and_mock_system_expect_generated_messages_drive_conversation(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
-        """Verify LLM mode wires AttackAgent through LLMAttackSource into the runner."""
-        # arrange
-        events_path = tmp_path / "events.jsonl"
-        monkeypatch.setattr(runner_main, "AttackAgent", FakeAttackAgent)
-
-        # act
-        runner_main.main(
-            events_path=events_path,
-            delay=0,
-            mock=True,
-            mode="llm",
-            verbose=False,
-            log_file=tmp_path / "arena.log",
-            scenario="all",
-        )
-
-        # assert
-        events = [json.loads(line) for line in events_path.read_text().splitlines()]
-        attacker_messages = [
-            event["payload"]["content"]
-            for event in events
-            if event["event_type"] == "conversation_turn" and event["payload"]["role"] == "user"
-        ]
-        assert events[0]["event_type"] == "scenario_started"
-        assert events[0]["payload"]["scenario_name"] == "llm_attack"
-        assert attacker_messages == ["first generated attack", "second generated attack"]
+        assert attacker_messages == ["attack from test-alpha", "attack from test-beta"]
 
     def test_when_invalid_mode_expect_bad_parameter(self, tmp_path: Path) -> None:
         """Verify CLI mode validation rejects unknown modes."""

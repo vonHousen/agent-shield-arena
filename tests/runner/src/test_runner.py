@@ -2,13 +2,16 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
+from attack_agent.src.strategies import AttackStrategy
 from common.src.event_emitter import EventEmitter
 from runner.src.attack_source import ConversationHistory, MockAttackSource
 from runner.src.mock_system import MockShieldedSystem
 from runner.src.models import ShieldedSystemResponse
-from runner.src.runner import run_all_scenarios, run_attack_conversation, run_attack_scenario
+from runner.src.runner import run_all_llm_scenarios, run_all_scenarios, run_attack_conversation, run_attack_scenario
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
+from shielded_system.src.models import ChatMessage
 
 
 class RecordingShieldedSystem:
@@ -169,3 +172,61 @@ class TestRunAttackConversation:
         # assert
         assert len(responses) == max_turns
         assert shielded_system.messages == ["turn one", "turn two"]
+
+
+class FakeAttackAgent:
+    """Attack agent double that returns one canned message then stops."""
+
+    def __init__(self, strategy: AttackStrategy | None = None) -> None:
+        """Initialize.
+
+        Args:
+            strategy: Strategy (captured for test assertions).
+        """
+        self.strategy = strategy
+        self._sent = False
+
+    async def generate_attack(self, conversation_history: list[ChatMessage]) -> str | None:
+        """Return one message then stop.
+
+        Args:
+            conversation_history: Unused.
+        """
+        if self._sent:
+            return None
+        self._sent = True
+        return f"attack from {self.strategy.name}" if self.strategy else "attack"
+
+
+class TestRunAllLlmScenarios:
+    async def test_when_all_strategies_run_expect_run_lifecycle_and_per_strategy_scenarios(
+        self, tmp_path: Path
+    ) -> None:
+        # arrange
+        events_path = tmp_path / "events.jsonl"
+        event_emitter = EventEmitter(events_path)
+        test_strategies = [
+            AttackStrategy(name="alpha", goal="Alpha goal.", opening="Alpha opening."),
+            AttackStrategy(name="beta", goal="Beta goal.", opening="Beta opening."),
+        ]
+
+        # act
+        with (
+            patch("runner.src.runner.SEED_STRATEGIES", test_strategies),
+            patch("runner.src.runner.AttackAgent", FakeAttackAgent),
+        ):
+            results = await run_all_llm_scenarios(
+                shielded_system=RecordingShieldedSystem(),
+                event_emitter=event_emitter,
+                turn_delay_seconds=0,
+            )
+
+        # assert
+        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        assert events[0]["event_type"] == "run_started"
+        assert events[0]["payload"]["scenario_count"] == len(test_strategies)
+        assert events[-1]["event_type"] == "run_completed"
+
+        scenario_names = [e["payload"]["scenario_name"] for e in events if e["event_type"] == "scenario_started"]
+        assert scenario_names == ["alpha", "beta"]
+        assert set(results.keys()) == {"alpha", "beta"}

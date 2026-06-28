@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Sequence
 from typing import Protocol
 
+from attack_agent.src.agent import AttackAgent
+from attack_agent.src.strategies import SEED_STRATEGIES
 from common.src.config import settings
 from common.src.event_emitter import EventEmitter
 from common.src.logging import get_logger
@@ -18,7 +20,7 @@ from common.src.models import (
     ToolCall,
     ToolResult,
 )
-from runner.src.attack_source import AttackSource, MockAttackSource
+from runner.src.attack_source import AttackSource, LLMAttackSource, MockAttackSource
 from runner.src.models import ShieldedSystemResponse
 from runner.src.scenario import get_all_scenarios, get_split_refund_bypass_scenario
 
@@ -178,6 +180,44 @@ async def run_all_scenarios(
         _emit_run_completed(event_emitter)
 
     logger.info(f"All {len(all_responses)} scenarios complete")
+    return all_responses
+
+
+async def run_all_llm_scenarios(
+    shielded_system: ShieldedSystem,
+    event_emitter: EventEmitter,
+    turn_delay_seconds: float = settings.runner_turn_delay_seconds,
+) -> dict[str, list[ShieldedSystemResponse]]:
+    """Run one LLM-driven conversation per seed strategy.
+
+    Each strategy gets a fresh AttackAgent pinned to that single strategy.
+    A short pause separates scenarios so the dashboard can distinguish them.
+
+    Args:
+        shielded_system: System under test.
+        event_emitter: Sink for arena events.
+        turn_delay_seconds: Delay between turns for real-time demo pacing.
+    """
+    all_responses: dict[str, list[ShieldedSystemResponse]] = {}
+
+    _emit_run_started(event_emitter, len(SEED_STRATEGIES))
+    try:
+        for strategy in SEED_STRATEGIES:
+            logger.info(f"=== Starting LLM scenario: {strategy.name} ===")
+            agent = AttackAgent(strategy=strategy)
+            responses = await run_attack_conversation(
+                shielded_system=shielded_system,
+                event_emitter=event_emitter,
+                attack_source=LLMAttackSource(agent),
+                scenario_name=strategy.name,
+                turn_delay_seconds=turn_delay_seconds,
+            )
+            all_responses[strategy.name] = responses
+            await asyncio.sleep(SCENARIO_PAUSE_SECONDS)
+    finally:
+        _emit_run_completed(event_emitter)
+
+    logger.info(f"All {len(all_responses)} LLM scenarios complete")
     return all_responses
 
 

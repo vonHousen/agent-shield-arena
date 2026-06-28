@@ -27,6 +27,7 @@ class AttackAgent:
     Args:
         llm_client: Async LLM client used to generate attack messages.
         max_messages: Maximum number of attack messages this agent may emit.
+        strategy: Explicit strategy to use. When provided, the selector is ignored.
         strategy_selector: Selector that chooses the seed strategy for this conversation.
     """
 
@@ -34,13 +35,14 @@ class AttackAgent:
         self,
         llm_client: LLMClient | None = None,
         max_messages: int = settings.attack_max_messages,
+        strategy: AttackStrategy | None = None,
         strategy_selector: RoundRobinStrategySelector | None = None,
     ) -> None:
         self._llm_client = llm_client or LiteLLMClient()
         self._max_messages = max_messages
         self._message_count = 0
         self._strategy_selector = strategy_selector or RoundRobinStrategySelector()
-        self._strategy: AttackStrategy | None = None
+        self._strategy: AttackStrategy | None = strategy
 
     async def generate_attack(self, conversation_history: list[ChatMessage]) -> str | None:
         """Generate the next attack message or stop the conversation.

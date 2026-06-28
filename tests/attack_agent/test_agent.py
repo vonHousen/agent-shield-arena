@@ -85,6 +85,35 @@ class TestAttackAgentGenerateAttack:
         assert len(llm_client.requests) == max_messages
 
     @pytest.mark.asyncio
+    async def test_when_explicit_strategy_provided_expect_selector_bypassed(self) -> None:
+        # arrange
+        attack_message = "I want a refund."
+        explicit_strategy = AttackStrategy(
+            name="explicit",
+            goal="Explicit goal.",
+            opening="Explicit opening.",
+        )
+        different_strategy = AttackStrategy(
+            name="from-selector",
+            goal="Selector goal.",
+            opening="Selector opening.",
+        )
+        llm_client = FakeLLMClient(completions=[_completion(attack_message)])
+        agent = AttackAgent(
+            llm_client=llm_client,
+            strategy=explicit_strategy,
+            strategy_selector=RoundRobinStrategySelector(strategies=[different_strategy]),
+        )
+
+        # act
+        await agent.generate_attack(conversation_history=[])
+
+        # assert
+        system_prompt = llm_client.requests[0][0]["content"]
+        assert "explicit" in system_prompt
+        assert "from-selector" not in system_prompt
+
+    @pytest.mark.asyncio
     async def test_when_llm_returns_stop_expect_none(self) -> None:
         # arrange
         llm_client = FakeLLMClient(completions=[_completion(" STOP ")])

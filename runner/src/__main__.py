@@ -6,19 +6,17 @@ from typing import Annotated
 
 import typer
 
-from attack_agent.src.agent import AttackAgent
 from common.src.config import settings
 from common.src.event_emitter import DEFAULT_EVENTS_PATH, EventEmitter
 from common.src.logging import DEFAULT_LOG_FILE, setup_logging
 from runner.src.adapter import RealShieldedSystemAdapter
-from runner.src.attack_source import LLMAttackSource
 from runner.src.mock_system import MockShieldedSystem
-from runner.src.runner import run_all_scenarios, run_attack_conversation, run_attack_scenario
+from runner.src.runner import run_all_llm_scenarios, run_all_scenarios, run_attack_scenario
 from runner.src.scenario import ALL_SCENARIOS
+from shielded_system.src.tools import reset_customer_db
 
 MODE_LLM = "llm"
 MODE_SCENARIO = "scenario"
-LLM_SCENARIO_NAME = "llm_attack"
 
 
 def main(
@@ -48,16 +46,15 @@ def main(
 
     if events_path.exists():
         events_path.unlink()
+    reset_customer_db()
     event_emitter = EventEmitter(events_path)
     system = MockShieldedSystem() if mock else RealShieldedSystemAdapter()
 
     if mode == MODE_LLM:
         asyncio.run(
-            run_attack_conversation(
+            run_all_llm_scenarios(
                 shielded_system=system,
                 event_emitter=event_emitter,
-                attack_source=LLMAttackSource(AttackAgent()),
-                scenario_name=LLM_SCENARIO_NAME,
                 turn_delay_seconds=delay,
             )
         )
